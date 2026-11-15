@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Leah Lift</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Barlow:wght@400;600&display=swap" rel="stylesheet">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#16181a;--card:#202326;--line:#33383c;--tx:#f1efe8;--dim:#9aa0a4;--acc:#f08a5d;--acc-tx:#2a0f05;--bad:#e5645a;--alt:#5cc2d6;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 Barlow,system-ui,sans-serif;padding-bottom:84px}
+main{max-width:560px;margin:0 auto;padding:14px}
+h1,h2,.big{font-family:'Barlow Condensed','Arial Narrow',sans-serif;margin:0}
+.big{font-size:54px;font-weight:800;line-height:1;letter-spacing:.5px}
+.hero{padding:10px 0 14px}
+.dim{color:var(--dim)}
+.small{font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
+.card.sub{background:transparent;border-style:dashed}
+h2{font-size:24px;font-weight:600}
+.trio{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:8px;margin:6px 0}
+.trio div{border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--card)}
+.trio .cur{border-color:var(--acc)}
+.trio b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:20px;line-height:1.1;margin-top:2px}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+label{font-size:13px;color:var(--dim);display:block}
+input,textarea,select{width:100%;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:12px;font:inherit;font-size:18px}
+textarea{font-size:16px;min-height:64px}
+input:focus,textarea:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+button{font:600 17px 'Barlow',sans-serif;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--tx);padding:14px;min-height:50px;cursor:pointer}
+button.pri{background:var(--acc);color:var(--acc-tx);border-color:var(--acc);width:100%;font-size:22px;min-height:64px;font-family:'Barlow Condensed',sans-serif;font-weight:800;letter-spacing:1px;margin-top:10px}
+button.wide{width:100%;margin-top:8px}
+button.danger{color:var(--bad);border-color:var(--bad)}
+.btns{display:flex;gap:8px;margin-top:8px}.btns button{flex:1}
+ul.l{list-style:none;margin:0;padding:0}
+ul.l li{padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:20px;padding:1px 8px;color:var(--dim);margin-left:6px}
+.tag.p{color:var(--acc);border-color:var(--acc)}
+.or{display:flex;align-items:center;gap:12px;color:var(--dim);font:800 20px 'Barlow Condensed',sans-serif;letter-spacing:2px;margin:26px 0 12px}.or:before,.or:after{content:"";flex:1;border-top:1px solid var(--line)}
+.card.alt{border:2px solid var(--alt)}.card.alt h2{color:var(--alt)}
+button.alt{background:var(--alt);color:#06222a;border-color:var(--alt);width:100%;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:22px;letter-spacing:1px;min-height:60px;margin-top:10px}
+label.ck{display:flex;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);font-size:18px;color:var(--tx)}
+label.ck input{width:26px;height:26px;padding:0;flex:none;accent-color:var(--acc)}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;border:0;border-radius:0;background:none;min-height:60px;color:var(--dim)}
+nav button.on{color:var(--acc)}
+#sheet{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center;z-index:9}
+#sheet.open{display:flex}
+#sheet>div{background:var(--card);width:100%;max-width:560px;border-radius:14px 14px 0 0;padding:18px;max-height:85vh;overflow:auto}
+pre{white-space:pre-wrap;font:inherit;margin:6px 0}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<datalist id="mvlist"></datalist>
+<div id="sheet"><div id="sheetbody"></div></div>
+<nav id="nav"></nav>
+<script>
+const KEY='leahlift.v1';
+const EQD={'Bodyweight':true,'Dumbbells':true,'Barbell & plates':true,'Kettlebells':true,'Bench':true,'Resistance bands':false,'Step or box':false};
+const DEF={slots:[
+ {name:'Squat',moves:['Goblet Squat','Back Squat','Dumbbell Sumo Squat']},
+ {name:'Power / Stamina',moves:['Kettlebell Swing','Dumbbell Hang Clean','Kettlebell Clean and Squat']},
+ {name:'Hinge',moves:['Romanian Deadlift','Dumbbell Romanian Deadlift','Hip Thrust']},
+ {name:'Push',moves:['Dumbbell Floor Press','Neutral-Grip Dumbbell Bench','Low-Incline Dumbbell Press']}
+],pos:0,log:[],metcon:-1,metconSkipped:false,draft:{},eq:{...EQD},myAcc:[],hide:[]};
+const ACC=[
+ {n:'Dumbbell Rows',f:'hpull',s:'3',r:'10-12',u:'per arm',eq:'Dumbbells',q:'Dumbbells'},
+ {n:'Barbell Rows',f:'hpull',s:'4',r:'8-10',eq:'Barbell & plates',q:'Barbell & plates'},
+ {n:'Kettlebell Rows',f:'hpull',s:'3',r:'10-12',u:'per arm',eq:'Kettlebells',q:'Kettlebells'},
+ {n:'Chest-Supported Dumbbell Rows',f:'hpull',s:'3',r:'12',eq:'Dumbbells, bench',q:'Bench'},
+ {n:'Band Rows',f:'hpull',s:'3',r:'15',eq:'Resistance bands',q:'Resistance bands'},
+ {n:'Dumbbell Floor Press',f:'hpress',s:'3',r:'10-12',eq:'Dumbbells',q:'Dumbbells'},
+ {n:'Neutral-Grip Dumbbell Bench',f:'hpress',s:'3',r:'10-12',eq:'Dumbbells, bench',q:'Bench'},
+ {n:'Low-Incline Dumbbell Press',f:'hpress',s:'3',r:'10-12',eq:'Dumbbells, bench',q:'Bench'},
+ {n:'Barbell Floor Press',f:'hpress',s:'3',r:'8-10',eq:'Barbell & plates',q:'Barbell & plates'},
+ {n:'Push-Ups',f:'hpress',s:'3',r:'AMRAP',eq:'Bodyweight',q:'Bodyweight'},
+ {n:'Goblet Squats',f:'squat',s:'3',r:'12-15',eq:'Dumbbell or kettlebell',q:'Dumbbells'},
+ {n:'Dumbbell Sumo Squats',f:'squat',s:'3',r:'12-15',eq:'Dumbbells',q:'Dumbbells'},
+ {n:'Back Squat',f:'squat',s:'3',r:'8-10',eq:'Barbell & plates',q:'Barbell & plates'},
+ {n:'Reverse Lunges',f:'uni',s:'3',r:'10-12',u:'per leg',eq:'Dumbbells',q:'Dumbbells'},
+ {n:'Walking Lunges',f:'uni',s:'3',r:'10-12',u:'per leg',eq:'Dumbbells',q:'Dumbbells'},
+ {n:'Lateral Lunges',f:'uni',s:'3',r:'10',u:'per leg',eq:'Dumbbells',q:'Dumbbells'},
+ {n:'Curtsy Lunges',f:'uni',s:'3',r:'10',u:'per leg',eq:'Dumbbells',q:'Dumbbells'},
+ {n:'Kettlebell Reverse Lunges',f:'uni',s:'3',r:'10',u:'per leg',eq:'Kettlebells',q:'Kettlebells'},
+ {n:'Step-Ups',f:'uni',s:'3',r:'10-12',u:'per leg',eq:'Step or box, dumbbells',q:'Step or box'},
+ {n:'Single-Leg Romanian Deadlifts',f:'uni',s:'3',r:'8-10',u:'per leg',eq:'Dumbbell or kettlebell',q:'Dumbbells'},
+ {n:'Romanian Deadlifts',f:'hinge',s:'3',r:'8-10',eq:'Barbell & plates',q:'Barbell & plates'},
+ {n:'Dumbbell Romanian Deadlifts',f:'hinge',s:'3',r:'10-12',eq:'Dumbbells',q:'Dumbbells'},
+ {n:'Dumbbell Hip Thrusts',f:'hinge',s:'3',r:'12-15',eq:'Dumbbell, bench',q:'Bench'},
+ {n:'Kettlebell Swings',f:'hinge',s:'4',r:'15',eq:'Kettlebells',q:'Kettlebells'},
+ {n:'Kettlebell Deadlifts',f:'hinge',s:'3',r:'12',eq:'Kettlebells',q:'Kettlebells'},
+ {n:'Glute Bridges',f:'hinge',s:'3',r:'15',eq:'Bodyweight',q:'Bodyweight'},
+ {n:'Dumbbell Biceps Curls',f:'arms',s:'2',r:'15',eq:'Dumbbells',q:'Dumbbells'},
+ {n:'Hammer Curls',f:'arms',s:'2',r:'12-15',eq:'Dumbbells',q:'Dumbbells'},
+ {n:'Barbell Curls',f:'arms',s:'2',r:'12',eq:'Barbell & plates',q:'Barbell & plates'},
+ {n:'Triceps Kickbacks',f:'arms',s:'2',r:'15',eq:'Dumbbells',q:'Dumbbells'},
+ {n:'Skull Crushers',f:'arms',s:'2',r:'12',eq:'Dumbbells, bench',q:'Bench'},
+ {n:'Band Triceps Pushdowns',f:'arms',s:'2',r:'15',eq:'Resistance bands',q:'Resistance bands'},
+ {n:'Planks',f:'core',s:'3',r:'30-45 sec',eq:'Bodyweight',q:'Bodyweight'},
+ {n:'Dead Bugs',f:'core',s:'3',r:'10',u:'per side',eq:'Bodyweight',q:'Bodyweight'},
+ {n:'Suitcase Carries',f:'core',s:'3',r:'30 m',u:'per side',eq:'Dumbbell or kettlebell',q:'Dumbbells'},
+ {n:'Russian Twists',f:'core',s:'3',r:'20',eq:'Dumbbell',q:'Dumbbells'},
+ {n:'Hollow Holds',f:'core',s:'3',r:'20-30 sec',eq:'Bodyweight',q:'Bodyweight'}
+];
+/* base score for each secondary family, by the family of the current primary lift */
+const COMP={
+ squat:{hpress:3,vpull:3,hpull:2,ohp:1,uni:-5,hinge:-4,squat:-6},
+ oly:{ohp:2,hpress:1,vpull:3,hpull:2,uni:-4,hinge:-3,squat:-4},
+ hinge:{vpull:3,hpull:2,hpress:2,ohp:1,uni:-5,hinge:-6,squat:-4},
+ hpress:{vpull:3,hpull:3,uni:4.5,hinge:2,squat:1,ohp:-1,hpress:-6},
+ ohp:{vpull:3,hpull:3,uni:4.5,hinge:2,squat:1,hpress:-1,ohp:-6}
+};
+const GRP={hpress:'push',ohp:'push',vpull:'pull',hpull:'pull',squat:'legs',uni:'legs',hinge:'legs',oly:'legs',arms:'arms',core:'core'};
+Object.values(COMP).forEach(c=>{c.arms=1.5;c.core=1});
+function famOf(n){const x=String(n||'').toLowerCase();
+ if(/bench/.test(x))return 'hpress';
+ if(/floor press|incline|push-?up|chest press/.test(x))return 'hpress';
+ if(/curl|kickback|skull|pushdown|triceps/.test(x))return 'arms';
+ if(/plank|dead bug|carr(y|ies)|twist|hollow|crunch/.test(x))return 'core';
+ if(/snatch[ -]grip/.test(x)&&/press|jerk/.test(x))return 'ohp';
+ if(/clean|snatch|\bohs\b/.test(x))return 'oly';
+ if(/lunge|split squat|step-?up/.test(x))return 'uni';
+ if(/squat/.test(x))return 'squat';
+ if(/deadlift|rdl|bridge|hip thrust|good morning|swing/.test(x))return 'hinge';
+ if(/press|jerk/.test(x))return 'ohp';
+ if(/pull|chin/.test(x))return 'vpull';
+ if(/\brows?\b/.test(x))return 'hpull';
+ return ''}
+function accOf(n){const k=t=>String(t||'').trim().toLowerCase().replace(/s$/,'');return [...ACC,...S.myAcc].find(a=>k(a.n)===k(n))}
+function famsOf(n){const x=String(n||'').toLowerCase();if(/pull|chin/.test(x)&&/\brows?\b/.test(x))return ['vpull','hpull'];const f=famOf(n);return f?[f]:[]}
+function lastFam(f){return S.log.filter(e=>(e.type==='primary'||e.type==='secondary')&&!accOf(nameOf(e))&&famsOf(nameOf(e)).includes(f)).sort((x,y)=>y.t-x.t)[0]}
+function recSec(){
+ const now=Date.now(),curM=at(S.pos).move,cur=famOf(curM),prev=S.pos>0?famOf(at(S.pos-1).move):'';
+ const nxt=[1,2,3].map(k=>famOf(at(S.pos+k).move)),LEGF=['squat','uni','hinge'],LOWER=['squat','hinge','oly'];
+ const rec=S.log.filter(e=>e.type==='secondary').sort((x,y)=>y.t-x.t).slice(0,3);
+ const lastUp=S.log.filter(e=>e.type==='primary'&&['hpress','ohp'].includes(famOf(e.move))).sort((x,y)=>y.t-x.t)[0];
+ const us=lastUp&&S.log.filter(e=>e.type==='secondary'&&e.t>lastUp.t&&e.t<=lastUp.t+20).sort((x,y)=>x.t-y.t)[0],upSec=us?famOf(us.move):'';
+ const rf=rec.map(e=>famOf(e.move)),rg=rec.map(e=>GRP[famOf(e.move)]),pgrp=GRP[prev],lastN=rec[0]?String(rec[0].move).toLowerCase():'',base=COMP[cur]||{};
+ const out=(ACCL().length?ACCL():ACC).map(a=>{let sc=base[a.f]||0;const why=[];
+  if(sc>=3)why.push('pairs well with '+curM);
+  if(a.f==='uni'&&(cur==='hpress'||cur==='ohp'))why.push('single-leg work after an upper-body lift');
+  nxt.forEach((f,i)=>{if(f===a.f)sc-=[3,1.5,.5][i];if(LEGF.includes(a.f)&&LOWER.includes(f))sc-=[1,.5,0][i]});
+  if(a.f===prev)sc-=2;
+  const g=GRP[a.f];if(g&&g===rg[0])sc-=3;if(g&&g===rg[1])sc-=1.5;if(g==='push'&&pgrp==='push')sc-=1.5;
+  if(a.f===upSec&&(cur==='hpress'||cur==='ohp'))sc-=2;
+  if(a.f===rf[0])sc-=2;if(a.f===rf[1])sc-=1;if(a.n.toLowerCase()===lastN)sc-=2;
+  const lt=lastTime(a.n)||lastTime(a.n.replace(/s$/,''))||lastFam(a.f);
+  if(!lt){sc+=2;why.push("you haven't logged it yet")}else{const d=(now-lt.t)/864e5;if(d>=14){sc+=1.5;why.push('not done in a while')}else if(d>=7)sc+=1;else if(d<=1)sc-=2;else if(d<=3)sc-=1}
+  return{a,sc,why}}).sort((x,y)=>y.sc-x.sc);
+ const seen={},best=out.filter(x=>seen[x.a.f]?false:(seen[x.a.f]=1)),near=best.filter(x=>x.sc>=best[0].sc-1),pick=near[S.pos%near.length];
+ return [pick,...out.filter(x=>x!==pick)]}
+const METCONS=[
+ {t:'20-minute stamina circuit',l:['4 rounds, 40 sec work / 20 sec rest','Kettlebell swings','Goblet squats','Dumbbell rows','Mountain climbers']},
+ {t:'10-minute EMOM',l:['Min 1: 12 goblet squats','Min 2: 10 dumbbell rows per arm','Min 3: 15 kettlebell swings','Min 4: 30 sec plank, rest of the minute']},
+ {t:'8-minute AMRAP',l:['10 reverse lunges (5 per leg)','10 push-ups','10 dumbbell RDLs','200 m brisk walk or jog']},
+ {t:'Pump burnout, 8 min',l:['Light weight, no rest between moves','20 curls','20 kickbacks','20 floor presses','20 glute bridges']},
+ {t:'12-minute ladder',l:['Climb 2-4-6-8-10, then back down','Kettlebell swings','Goblet squats','Push-ups']},
+ {t:'6-minute core finisher',l:['3 rounds','30 sec plank','10 dead bugs per side','12 Russian twists']},
+ {t:'Cardio intervals, 15 min',l:['30 sec fast / 30 sec easy','Jog, bike, row or jump rope','Your choice of machine or road']}
+];
+let S,view='home',mem=null,pg=null,pgNames=[];
+function load(){try{const r=localStorage.getItem(KEY);if(r)return JSON.parse(r)}catch(e){}return mem?JSON.parse(mem):JSON.parse(JSON.stringify(DEF))}
+function save(){const j=JSON.stringify(S);mem=j;try{localStorage.setItem(KEY,j)}catch(e){}}
+S=load();if(!S.eq)S.eq={...EQD};if(!S.myAcc)S.myAcc=[];if(!S.hide)S.hide=[];
+function allAcc(){return [...ACC,...S.myAcc].filter(a=>!S.hide.includes(a.n))}
+function eqOn(q){return !q||q==='Bodyweight'||S.eq[q]===true}
+function ACCL(){return allAcc().filter(a=>eqOn(a.q))}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fd=t=>new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+function at(i){const n=S.slots.length,s=S.slots[((i%n)+n)%n],r=Math.floor(i/n);return{move:s.moves[((r%s.moves.length)+s.moves.length)%s.moves.length],slot:s.name}}
+function lastTime(m){return S.log.filter(x=>(x.type==='primary'||x.type==='secondary')&&nameOf(x)===m).sort((a,b)=>a.t-b.t).pop()}
+function fmtSet(e){const b=[e.w,e.s,e.r].map(v=>v===''||v==null?'?':v);return b.join(' × ')}
+function mcKey(m){return m.lib?m.t:m.t+': '+m.l.join(', ')}
+function poolAll(){return [...METCONS.map(m=>({t:m.t,l:m.l,p:!!m.p,lib:false})),...(S.lib||[]).map(m=>({t:m.t,l:m.l,p:!!m.p,lib:true,id:m.id}))]}
+function wkey(e){return String(e.wk||e.move).trim().toLowerCase()}
+function lastDone(m){const k=mcKey(m).toLowerCase();return Math.max(0,...S.log.filter(e=>(e.type==='metcon'||e.type==='random'||e.type==='extra')&&wkey(e)===k).map(e=>e.t))}
+function pickFinisher(){const pm=S.mode==='partner',cur=S.mc?mcKey(S.mc):null;
+ let c=poolAll().filter(m=>!!m.p===pm);if(!c.length)return;
+ const o=c.filter(m=>mcKey(m)!==cur);if(o.length)c=o;
+ c=c.map(m=>({m,d:lastDone(m),r:Math.random()})).sort((x,y)=>x.d-y.d||x.r-y.r);
+ const m=c[Math.floor(Math.random()*Math.min(3,c.length))].m;
+ S.mc={t:m.t,l:[...m.l],p:!!m.p,lib:m.lib};S.metconSkipped=false}
+if(!S.lib)S.lib=[];if(!S.mc&&METCONS[S.metcon]){const m=METCONS[S.metcon];S.mc={t:m.t,l:[...m.l],p:!!m.p,lib:false}}if(!S.mc||!!S.mc.p!==(S.mode==='partner')){pickFinisher();save()}
+function draft(k,v){S.draft[k]=v;save()}
+function sheet(h){$('sheetbody').innerHTML=h;$('sheet').classList.add('open')}
+function closeSheet(){$('sheet').classList.remove('open')}
+$('sheet').addEventListener('click',e=>{if(e.target.id==='sheet')closeSheet()});
+function confirmSheet(msg,label,fn,danger){window._cf=fn;sheet(`<h2>${esc(msg)}</h2><div class="btns"><button onclick="closeSheet()">Cancel</button><button class="${danger?'danger':'pri'}" style="${danger?'':'margin:0;font-size:18px;min-height:50px'}" onclick="closeSheet();_cf()">${esc(label)}</button></div>`)}
+
+function field(id,lab,val,ph,type){return `<div><label for="${id}">${lab}</label><input id="${id}" ${type||'inputmode="decimal"'} value="${esc(val)}" placeholder="${esc(ph||'')}" oninput="draft('${id}',this.value)"></div>`}
+
+function home(){
+ const cur=at(S.pos),last=S.pos>0?at(S.pos-1):null,nxt=at(S.pos+1);
+ const le=last&&[...S.log].reverse().find(x=>x.type==='primary'&&x.pos===S.pos-1);
+ const ahead=[1,2,3,4,5].map(i=>at(S.pos+i).move).join(' → ');
+ const d=S.draft,vn=curVN(),lt=lastTime(vn),pvv=d.pv!==undefined?d.pv:lastVar(cur.move);
+ const lw=lt?parseFloat(lt.w):NaN,st=S.step??5,up=+(lw+st).toFixed(2);
+ const sugg=isFinite(lw)?`<div class="btns"><button onclick="fillW(${lw})">Use last: ${lw}</button><button onclick="fillW(${up})">Try: ${up}</button></div>`:'';
+ const R=recSec(),mc=S.mc,own=d.mo!==undefined;
+ const alts=[R[0],...R.slice(1,8).filter(x=>x.a.f!==R[0].a.f)].slice(0,3);window._rs=alts.map(x=>x.a.n);
+ const sugBlock=`<div class="small" style="margin-top:6px">Suggested: <b>${esc(R[0].a.n)}</b>${R[0].why.length?`<span class="dim"> · ${esc(R[0].why.slice(0,2).join(', '))}</span>`:''}</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px">${alts.map((x,j)=>`<button style="min-height:40px;padding:6px 12px;font-size:15px;${j?'':'border-color:var(--acc);color:var(--acc)'}" onclick="sugPick(${j})">${esc(x.a.n)}</button>`).join('')}</div>`;
+ const SI=getSI();
+ const secCard=`<div class="card sub"><div class="dim small">Pump tracks · add as many as you like</div>${sugBlock}${trackRow()}${SI.map((it,i)=>{const nm=(it.n||'').trim(),sl=nm?lastTime(nm):null;return `<div style="${i?'border-top:1px solid var(--line);margin-top:14px;padding-top:12px':'margin-top:6px'}">
+ <label for="sv${i}">Movement</label><input id="sv${i}" type="text" list="mvlist" value="${esc(it.n)}" onfocus="this.select()" onchange="siSet(${i},'n',this.value);refreshS(${i})">
+ <div id="sl${i}" class="dim small" style="margin-top:4px">${slHtml(i,nm)}</div>
+ <div class="row">${sf(i,'w','Weight',it.w)}${sf(i,'s','Sets',it.s)}${sf(i,'r','Reps',it.r)}</div>
+ <label for="st${i}">Notes</label><textarea id="st${i}" placeholder="Variation, scheme, anything specific" oninput="siSet(${i},'nt',this.value)">${esc(it.nt)}</textarea>
+ <button class="wide danger" style="min-height:40px" onclick="siDel(${i})">${SI.length>1?'Remove':'Skip secondary'}</button></div>`}).join('')}
+ <button class="wide" onclick="siAdd()">+ Add another movement</button></div>`;
+ const pm=S.mode==='partner',on='border-color:var(--acc);color:var(--acc)';
+ const modeSw='';
+ const res=`<label for="mr">Result (rounds or time)</label><input id="mr" type="text" value="${esc(d.mr)}" oninput="draft('mr',this.value)">`;
+ const mcard=S.metconSkipped?`<h2>Skipped</h2><div class="btns"><button onclick="S.metconSkipped=false;save();render()">Show finisher</button><button onclick="S.metconSkipped=false;S.draft.mo='';save();render()">I did my own</button></div>`
+ :own?`<h2>My own finisher</h2><label for="mo">What did you do?</label><textarea id="mo" oninput="draft('mo',this.value)">${esc(d.mo)}</textarea>${res}<div class="btns"><button onclick="delete S.draft.mo;save();render()">Use suggested</button><button onclick="S.metconSkipped=true;save();render()">Skip finisher</button></div>`
+ :`<h2>${esc(mc.t)}</h2><ul class="l" style="margin:6px 0">${mc.l.map(x=>`<li style="cursor:default;padding:6px 0">${esc(x)}</li>`).join('')}</ul>${res}
+ <div class="btns"><button onclick="pickFinisher();save();render()">New finisher</button><button onclick="pickSheet()">Choose</button><button onclick="S.metconSkipped=true;save();render()">Skip</button></div>
+ <button class="wide" onclick="S.draft.mo='';save();render()">I did my own instead</button>`;
+ return `<div class="hero"><div class="dim small">Next workout · queue #${S.pos+1}</div><div class="big">${esc(cur.move.toUpperCase())}</div><div class="dim">Slot: ${esc(cur.slot)}${vn!==cur.move?' · doing '+esc(vn):''}</div></div>
+ <div class="trio"><div><span class="dim small">Last</span><b>${last?esc(last.move):'None'}</b>${le?`<span class="dim small">${fd(le.t)}</span>`:''}</div>
+ <div class="cur"><span class="small" style="color:var(--acc)">Current</span><b>${esc(cur.move)}</b></div>
+ <div><span class="dim small">Next</span><b>${esc(nxt.move)}</b></div></div>
+ <div class="dim small">Coming up: ${esc(cur.move)} → ${esc(ahead)}…</div>
+ <div class="card"><h2>Primary: ${esc(cur.move)}</h2>
+ <label for="pv">Variation (what you actually did)</label><input id="pv" type="text" list="mvlist" value="${esc(pvv)}" placeholder="${esc(cur.move)}" onfocus="this.select()" onchange="draft('pv',this.value);refreshP()">
+ <div id="ltp" style="margin-top:6px">${primLast()}</div>
+ <div class="row">${field('pw','Weight',d.pw,lt?lt.w:'')}${field('ps','Sets',d.ps,lt?lt.s:'')}${field('pr','Reps',d.pr,lt?lt.r:'')}</div>
+ <label for="pn">Notes</label><textarea id="pn" oninput="draft('pn',this.value)">${esc(d.pn)}</textarea></div>
+ ${secCard}
+ <div class="card sub"><div class="dim small">Stamina finisher</div>${modeSw}${mcard}</div>
+ <button class="pri" onclick="askLog()">LOG WORKOUT</button>
+ <div class="or">OR</div>
+ <div class="card alt"><h2>Something else today?</h2><div class="dim small">Doing your own workout instead, or adding cardio after your lifts? Log it here. The queue stays put.</div>
+ <button class="alt" onclick="randomSheet()">RANDOM WORKOUT</button></div>`;
+}
+function trackRow(){const T=[['Legs',['uni','squat','hinge']],['Back',['hpull','vpull']],['Chest',['hpress']],['Arms',['arms']],['Core',['core']]];window._tk=T;return `<div class="dim small" style="margin-top:8px">Quick add a track:</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0">${T.map((t,i)=>`<button style="min-height:40px;padding:6px 12px;font-size:15px" onclick="trackAdd(${i})">+ ${t[0]}</button>`).join('')}</div>`}
+function trackAdd(i){const fs=window._tk[i][1],have=getSI().map(it=>(it.n||'').trim().toLowerCase()),R=recSec().find(x=>fs.includes(x.a.f)&&!have.includes(x.a.n.toLowerCase()));if(!R)return msg('Nothing left for that track. Turn on more equipment or movements in Gear.');sugAdd(R.a.n)}
+function sugAdd(nm){const fresh=!S.draft.si,a=getSI(),e=a.findIndex(it=>!(it.n||'').trim());if(e>=0)a[e]={n:nm};else if(fresh)a[0]={n:nm};else a.push({n:nm});S.draft.si=a;save();render()}
+function nameOf(e){return e.variation||e.move}
+function lifts(){return S.log.filter(e=>e.type==='primary'||e.type==='secondary')}
+function lastVar(m){const e=S.log.filter(x=>x.type==='primary'&&x.move===m).sort((a,b)=>a.t-b.t).pop();return e&&e.variation||''}
+function curVN(){const m=at(S.pos).move,d=S.draft;return ((d.pv!==undefined?d.pv:lastVar(m))||'').trim()||m}
+function getSI(){const d=S.draft;if(d.si)return d.si;const it={n:recSec()[0].a.n};if(d.sw||d.ss||d.sr||d.sn){it.w=d.sw;it.s=d.ss;it.r=d.sr;it.nt=d.sn}return [it]}
+function siSet(i,k,v){const a=S.draft.si=getSI();if(!a[i])a[i]={};a[i][k]=v;save()}
+function siAdd(){const a=S.draft.si=getSI();a.push({n:''});save();render()}
+function siDel(i){const a=S.draft.si=getSI();a.splice(i,1);if(!a.length)a.push({n:''});save();render()}
+function sf(i,k,l,v){return `<div><label for="s${k}${i}">${l}</label><input id="s${k}${i}" inputmode="decimal" value="${esc(v)}" oninput="siSet(${i},'${k}',this.value)"></div>`}
+function primLast(){const cur=at(S.pos),vn=curVN(),lt=lastTime(vn),lw=lt?parseFloat(lt.w):NaN,st=S.step??5,up=+(lw+st).toFixed(2);
+ return (lt?`<div class="dim">Last time${vn!==cur.move?' ('+esc(vn)+')':''}: ${esc(fmtSet(lt))}${lt.n?' · '+esc(lt.n):''}</div>`:'<div class="dim">First time on this movement.</div>')
+ +(isFinite(lw)?`<div class="btns"><button onclick="fillW(${lw})">Use last: ${lw}</button><button onclick="fillW(${up})">Try: ${up}</button></div>`:'')
+ +`<button class="wide" style="min-height:40px;font-size:15px;color:var(--dim)" onclick="showProgNow()">See ${esc(vn)} progression</button>`}
+function refreshP(){const lt=lastTime(curVN());$('ltp').innerHTML=primLast();[['pw','w'],['ps','s'],['pr','r']].forEach(([id,k])=>{const el=$(id);if(el)el.placeholder=lt?lt[k]:''})}
+function slHtml(i,nm){nm=(nm||'').trim();if(!nm)return '';const sl=lastTime(nm),a=accOf(nm);
+ return (sl?'Last time: '+esc(fmtSet(sl))+(sl.n?' · '+esc(sl.n):''):'')
+ +(a?`<div style="margin-top:4px">Try ${a.s} × ${a.r}${a.u?' '+a.u:''} · ${esc(a.eq)} <button style="min-height:32px;padding:2px 10px;font-size:13px" onclick="rxFill(${i})">Fill</button></div>`:'')}
+function refreshS(i){const nm=((getSI()[i]||{}).n||'').trim();$('sl'+i).innerHTML=slHtml(i,nm)}
+function rxFill(i){const it=getSI()[i],a=accOf(it&&it.n);if(!a)return;siSet(i,'s',a.s);siSet(i,'r',a.r);if(a.u&&!(it.nt||'').trim())siSet(i,'nt',a.u);render()}
+function sugPick(j){const nm=window._rs[j],a=getSI(),e=a.findIndex(it=>!(it.n||'').trim());
+ if(e>=0)a[e]={n:nm};else if(!(a[0].w||a[0].s||a[0].r||a[0].nt))a[0]={n:nm};else a.push({n:nm});
+ S.draft.si=a;save();render()}
+function showProgNow(){view='progress';pg={k:'v',name:curVN()};render();scrollTo(0,0)}
+function showProg(k,i){pg={k,name:pgNames[i]};render();scrollTo(0,0)}
+function showFor(id){const e=S.log.find(x=>x.id===id);if(!e)return;closeSheet();view='progress';pg=(e.type==='primary'||e.type==='secondary')?{k:'v',name:nameOf(e)}:{k:'w',name:wkey(e)};render();scrollTo(0,0)}
+function setMode(m){if(S.mode===m)return;S.mode=m;pickFinisher();save();render()}
+function fillW(v){S.draft.pw=String(v);save();render()}
+function askLog(){
+ const c=at(S.pos),n=at(S.pos+1),d=S.draft,mc=S.mc,own=d.mo!==undefined,sec=recSec()[0].a.n;
+ const SI=getSI().filter(it=>(it.n||'').trim()),hasS=SI.some(it=>it.w||it.s||it.r||it.nt),mcOk=!S.metconSkipped&&(!own||!!d.mo.trim()),mcOn=mcOk&&(own||!!d.mr);
+ sheet(`<h2>Log workout</h2><div class="dim small">Check what you completed. Only the primary moves the queue.</div>
+ <label class="ck"><input type="checkbox" checked disabled><span><b>Primary:</b> ${esc(curVN()===c.move?c.move:curVN()+' ('+c.move+')')}</span></label>
+ <label class="ck"><input id="ks" type="checkbox" ${hasS?'checked':''}><span><b>Secondary:</b> ${esc(SI.map(it=>it.n.trim()).join(', ')||sec)}</span></label>
+ ${mcOk?`<label class="ck"><input id="km" type="checkbox" ${mcOn?'checked':''}><span><b>Finisher:</b> ${esc(own?d.mo.trim().slice(0,60):mc.t)}</span></label>`:''}
+ ${(!d.pw||!d.ps||!d.pr)?'<p class="small" style="color:var(--bad)">Weight, sets or reps are blank. You can fix it later from History.</p>':''}
+ <p class="dim small">Queue moves on to ${esc(n.move)}.</p>
+ <div class="btns"><button onclick="closeSheet()">Cancel</button><button class="pri" style="margin:0;font-size:18px;min-height:50px" onclick="logWod()">Log workout</button></div>`)}
+function logWod(){
+ const d=S.draft,c=at(S.pos),t=Date.now(),ks=$('ks').checked,km=$('km')&&$('km').checked,vn=curVN();
+ const p={id:t,type:'primary',t,move:c.move,slot:c.slot,pos:S.pos,w:d.pw??'',s:d.ps??'',r:d.pr??'',n:d.pn??''};
+ if(vn!==c.move)p.variation=vn;
+ S.log.push(p);let k=1;
+ if(ks)getSI().filter(it=>(it.n||'').trim()).forEach(it=>{S.log.push({id:t+k,type:'secondary',t:t+k,move:it.n.trim(),w:it.w??'',s:it.s??'',r:it.r??'',n:it.nt??''});k++});
+ if(km){const mc=S.mc,own=d.mo!==undefined;const nm=own?d.mo.trim():mcKey(mc);S.log.push({id:t+k,type:'metcon',t:t+k,move:own||!mc.lib?nm:mc.t+': '+mc.l.join(', '),wk:nm,n:d.mr??''})}
+ S.pos++;['pw','ps','pr','pn','pv','si','sw','ss','sr','sn','mr','mo'].forEach(x=>delete d[x]);pickFinisher();save();closeSheet();render();scrollTo(0,0)}
+function randomSheet(){
+ const names=[...new Set([...(S.lib||[]).map(w=>w.t),...S.log.filter(e=>e.type==='random').map(e=>e.move)])];
+ sheet(`<h2>Random workout</h2><p class="dim small">Logged as extra. The queue does not move.</p>
+ <label for="rn">What did you do?</label><input id="rn" type="text" list="wklist" placeholder="Murph, Cindy, 5k run…" oninput="wkHint(this.value)">
+ <datalist id="wklist">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+ <div id="rh" class="dim small" style="margin-top:4px"></div>
+ <label for="rd" style="margin-top:10px">Result / notes</label><textarea id="rd"></textarea>
+ ${dateField()}
+ <label class="ck"><input id="rl" type="checkbox"><span>Save to my library (add details there later)</span></label>
+ <div class="btns"><button onclick="closeSheet()">Cancel</button><button class="alt" style="margin:0;font-size:18px;min-height:50px" onclick="logRandom()">Log workout</button></div>`)}
+function wkHint(v){const w=(S.lib||[]).find(x=>x.t.toLowerCase()===v.trim().toLowerCase());$('rh').textContent=w?w.l.join(' · '):''}
+function logRandom(){const n=$('rn').value.trim()||'Random workout';
+ const t=pickT();S.log.push({id:t+Math.floor(Math.random()*1e3),type:'random',t,move:n,n:$('rd').value});
+ if($('rl').checked&&!(S.lib||[]).some(x=>x.t.toLowerCase()===n.toLowerCase()))S.lib.push({id:Date.now()+1,t:n,l:[n],p:false});
+ save();closeSheet();render()}
+function dateField(dt){const v=ymd(Date.now());window._today=v;return `<label for="xd" style="margin-top:10px">Date</label><input id="xd" type="date" value="${dt||v}">`}
+function pickT(){const v=$('xd').value;return !v||v===window._today?Date.now():new Date(v+'T12:00:00').getTime()}
+const TAGS={extra:'Extra',primary:'Primary',secondary:'Secondary',random:'Extra / Random',metcon:'Finisher'};
+function ymd(t){const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function history(){
+ const L=[...S.log].sort((a,b)=>b.t-a.t);
+ const top=`<div style="display:flex;justify-content:space-between;align-items:center"><h2>History</h2><button style="min-height:44px;padding:8px 14px" onclick="addSheet()">+ Add entry</button></div>`;
+ if(!L.length)return top+`<p class="dim">Nothing logged yet. Finish a primary lift and it shows up here.</p>`;
+ let out='',day='';
+ L.forEach(e=>{const k=ymd(e.t);
+  if(k!==day){if(day)out+='</ul>';day=k;out+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px;border-bottom:1px solid var(--line)"><b style="font-family:'Barlow Condensed',sans-serif;font-size:22px">${fd(e.t)}</b><button style="min-height:36px;padding:4px 12px;font-size:14px;color:var(--dim)" onclick="addSheet('${k}')">+ Add to this day</button></div><ul class="l">`}
+  out+=`<li onclick="detail(${e.id})">${esc(e.type==='metcon'?'Finisher':nameOf(e))}<span class="tag ${e.type==='primary'?'p':''}">${TAGS[e.type]||e.type}</span>
+ ${e.type==='primary'||e.type==='secondary'?`<div class="dim">${esc(fmtSet(e))}${e.variation?' · '+esc(e.move):''}</div>`:''}${e.type==='metcon'||e.type==='random'||e.type==='extra'?`<div class="dim">${esc((e.type==='metcon'?e.move:e.n||'').slice(0,80))}${e.type==='metcon'&&e.n?' · '+esc(e.n):''}</div>`:''}</li>`});
+ return top+out+'</ul>'}
+function editSheet(id){const e=S.log.find(x=>x.id===id);if(!e)return;
+ const lift=e.type==='primary'||e.type==='secondary',mc=e.type==='metcon';
+ sheet(`<h2>Edit entry</h2>
+ <label for="em">${mc?'What was it?':e.type==='primary'?'Primary focus (queue movement)':'Movement / name'}</label>${mc?`<textarea id="em">${esc(e.move)}</textarea>`:`<input id="em" type="text" value="${esc(e.move)}">`}
+ ${e.type==='primary'?`<label for="ev" style="margin-top:10px">Variation done (blank = same as focus)</label><input id="ev" type="text" list="mvlist" value="${esc(e.variation||'')}">`:''}
+ ${lift?`<div class="row"><div><label for="ew">Weight</label><input id="ew" inputmode="decimal" value="${esc(e.w)}"></div><div><label for="es">Sets</label><input id="es" inputmode="decimal" value="${esc(e.s)}"></div><div><label for="er">Reps</label><input id="er" inputmode="decimal" value="${esc(e.r)}"></div></div>`:''}
+ <label for="en" style="margin-top:10px">${mc?'Result (rounds or time)':'Notes'}</label><textarea id="en">${esc(e.n)}</textarea>
+ <label for="ed" style="margin-top:10px">Date</label><input id="ed" type="date" value="${ymd(e.t)}">
+ <div class="btns"><button onclick="closeSheet()">Cancel</button><button class="pri" style="margin:0;font-size:18px;min-height:50px" onclick="saveEdit(${id})">Save</button></div>`)}
+function saveEdit(id){const e=S.log.find(x=>x.id===id);if(!e)return;
+ const m=$('em').value.trim();if(m)e.move=m;
+ if($('ev')){const v=$('ev').value.trim();if(v&&v!==e.move)e.variation=v;else delete e.variation}
+ if($('ew')){e.w=$('ew').value.trim();e.s=$('es').value.trim();e.r=$('er').value.trim()}
+ e.n=$('en').value;
+ const d=$('ed').value;if(d&&d!==ymd(e.t))e.t=new Date(d+'T12:00:00').getTime();
+ save();closeSheet();render()}
+function addSheet(dt){sheet(`<h2>Add to history</h2><p class="dim small">Logged as an extra. The queue does not move.</p>
+ <label for="rn">What did you do?</label><input id="rn" type="text" placeholder="5k run, rowing, cardio…">
+ <label for="rd" style="margin-top:10px">Notes</label><textarea id="rd"></textarea>
+ ${dateField(dt)}
+ <div class="btns"><button onclick="closeSheet()">Cancel</button><button class="pri" style="margin:0;font-size:18px;min-height:50px" onclick="logExtra()">Add</button></div>`)}
+function logExtra(){const n=$('rn').value.trim()||'Extra workout';
+ const t=pickT();S.log.push({id:t+Math.floor(Math.random()*1e3),type:'extra',t,move:n,n:$('rd').value});save();closeSheet();render()}
+function detail(id){
+ const e=S.log.find(x=>x.id===id);if(!e)return;
+ const prev=e.type==='primary'||e.type==='secondary'?S.log.filter(x=>nameOf(x)===nameOf(e)&&(x.type==='primary'||x.type==='secondary')&&x.id!==id&&x.t<e.t).sort((a,b)=>b.t-a.t).slice(0,5):[];
+ sheet(`<h2>${esc(e.type==='metcon'?'Finisher':nameOf(e))}</h2><div class="dim">${new Date(e.t).toLocaleString()} · ${TAGS[e.type]}</div>
+ ${e.type==='primary'?`<p>Queue position: #${e.pos+1} · ${esc(e.move)} (${esc(e.slot)})</p>`:''}
+ ${e.type==='primary'||e.type==='secondary'?`<p>Weight × sets × reps: <b>${esc(fmtSet(e))}</b></p>`:`<pre>${esc(e.type==='metcon'?e.move:'')}</pre>`}
+ ${e.n?`<p>Notes: ${esc(e.n)}</p>`:''}
+ ${prev.length?`<div class="dim small">Previous sessions</div><ul class="l">${prev.map(p=>`<li style="cursor:default">${fd(p.t)} — ${esc(fmtSet(p))}${p.n?' · '+esc(p.n):''}</li>`).join('')}</ul>`:''}
+ ${e.type==='primary'||e.type==='secondary'?`<button class="wide" onclick="showFor(${id})">See progression for ${esc(nameOf(e))}</button>`:`<button class="wide" onclick="showFor(${id})">See this workout's history</button>`}
+ <div class="btns"><button class="danger" onclick="confirmSheet('Delete this entry? The queue position stays as it is.','Delete',()=>{S.log=S.log.filter(x=>x.id!==${id});save();render()},true)">Delete</button><button onclick="editSheet(${id})">Edit</button><button onclick="closeSheet()">Close</button></div>`)}
+
+function settings(){
+ const up=Array.from({length:12},(_,i)=>at(S.pos+i).move);
+ const hasUndo=S.log.some(x=>x.type==='primary');
+ return `<h2>Rotation</h2>
+ <div class="card"><div class="dim small">Queue from now</div><p>${up.map((m,i)=>i===0?`<b style="color:var(--acc)">${esc(m)}</b>`:esc(m)).join(' → ')}…</p></div>
+ <div class="dim small">Each slot rotates through its own movements, one per visit. Slots cycle in the order listed. Remove a movement with ✕ or add your own below it.</div>
+ ${S.slots.map((s,i)=>`<div class="card"><label for="sn${i}">Slot name</label><input id="sn${i}" type="text" value="${esc(s.name)}" onchange="S.slots[${i}].name=this.value.trim()||'Slot';save()">
+ <ul class="l" style="margin-top:8px">${s.moves.map((m,j)=>`<li style="display:flex;gap:6px;align-items:center;cursor:default"><span style="flex:1">${esc(m)}</span><button style="min-height:40px;padding:4px 12px" aria-label="Move up" onclick="mvMove(${i},${j},-1)" ${j?'':'disabled'}>↑</button><button style="min-height:40px;padding:4px 12px" aria-label="Move down" onclick="mvMove(${i},${j},1)" ${j<s.moves.length-1?'':'disabled'}>↓</button><button class="danger" style="min-height:40px;padding:4px 12px" aria-label="Remove ${esc(m)}" onclick="mvDel(${i},${j})">✕</button></li>`).join('')}</ul>
+ <div class="btns"><input id="am${i}" type="text" list="mvlist" placeholder="Add a movement" style="flex:3" onkeydown="if(event.key==='Enter')mvAdd(${i})"><button onclick="mvAdd(${i})">Add</button></div>
+ <div class="btns"><button onclick="moveSlot(${i},-1)" ${i===0?'disabled':''}>Slot up</button><button onclick="moveSlot(${i},1)" ${i===S.slots.length-1?'disabled':''}>Slot down</button><button class="danger" onclick="removeSlot(${i})">Remove slot</button></div></div>`).join('')}
+ <button class="wide" onclick="addSlot()">+ Add slot</button>
+ <div class="card"><h2>Queue position</h2><div class="dim small">Now at #${S.pos+1}: ${esc(at(S.pos).move)}. To jump to a different spot, enter a queue number.</div>
+ <label for="qp" style="margin-top:8px">Set current workout to number</label><input id="qp" inputmode="numeric" placeholder="${S.pos+1}" oninput="qpPrev(this.value)">
+ <div id="qpv" class="small" style="color:var(--acc);min-height:20px;margin-top:4px"></div>
+ <button class="wide" onclick="setPos()">Set position</button></div>
+ <div class="card"><h2>Weight suggestion</h2><label for="stp">Suggested increase over last time</label>
+ <input id="stp" inputmode="decimal" value="${S.step??5}" onchange="S.step=Math.max(0,parseFloat(this.value)||5);this.value=S.step;save()"></div>
+ <div class="card"><h2>Workout library</h2><div class="dim small">${(S.lib||[]).length} saved. Add your own workouts one at a time or upload many, then pick them or let them come up as suggestions.</div>
+ <button class="wide" onclick="view='library';render();scrollTo(0,0)">Open library</button></div>
+ <div class="card"><h2>Excel backup</h2><div class="dim small">Export saves history, rotation and queue position to a .xlsx file. Import replaces everything in the app with the file's contents.</div>
+ <button class="wide" onclick="exportXlsx()">Export to Excel</button>
+ <input id="xf" type="file" accept=".xlsx,.xls,.csv" hidden onchange="importXlsx(this)">
+ <button class="wide" onclick="$('xf').click()">Import from Excel</button></div>
+ <div class="card"><h2>Fix a mistake</h2>
+ <button class="wide" ${hasUndo?'':'disabled'} onclick="confirmSheet('Undo the last logged workout? The primary and any secondary or metcon logged with it are removed, and the primary and secondary numbers go back in the form.','Undo',undoAdv)">Undo last advancement</button>
+ <button class="wide" onclick="confirmSheet('Skip ahead to ${esc(at(S.pos+1).move).replace(/'/g,"\\'")} without logging a workout?','Advance',()=>{S.pos++;save();render()})">Advance queue manually</button>
+ <button class="wide" onclick="confirmSheet('Restore the starting movement lists? History and queue number are kept.','Restore',()=>{S.slots=JSON.parse(JSON.stringify(DEF.slots));save();render()})">Restore default movements</button>
+ <button class="wide danger" onclick="confirmSheet('Reset the rotation to the start? History is kept.','Reset',()=>{S.pos=0;save();render()},true)">Reset rotation</button></div>`}
+function moveSlot(i,d){const j=i+d;[S.slots[i],S.slots[j]]=[S.slots[j],S.slots[i]];save();render()}
+function removeSlot(i){if(S.slots.length<2)return msg('Keep at least one slot.');S.slots.splice(i,1);save();render()}
+function addSlot(){S.slots.push({name:'New slot',moves:['New movement']});save();render()}
+function mvAdd(i){const v=$('am'+i).value.trim();if(!v)return;S.slots[i].moves.push(v);save();render()}
+function mvDel(i,j){const s=S.slots[i];if(s.moves.length<2)return msg('A slot needs at least one movement. Add another first, then remove this one.');s.moves.splice(j,1);save();render()}
+function mvMove(i,j,d){const a=S.slots[i].moves,k=j+d;if(k<0||k>=a.length)return;[a[j],a[k]]=[a[k],a[j]];save();render()}
+const FAMS=[['Back','hpull'],['Chest','hpress'],['Legs (squat)','squat'],['Legs (single-leg)','uni'],['Glutes / hinge','hinge'],['Arms','arms'],['Core','core']];
+function gear(){const eq=Object.keys(S.eq).filter(k=>k!=='Bodyweight'),all=[...ACC,...S.myAcc],rm='style="min-height:36px;padding:2px 10px;font-size:14px" class="danger"';
+ return `<h2>Gear</h2><div class="dim small">Turn on the equipment you have. Suggestions only use movements that match it.</div>
+ <div class="card"><h2>Equipment</h2>${eq.map((k,i)=>`<label class="ck"><input type="checkbox" ${S.eq[k]?'checked':''} onchange="eqSet(${i},this.checked)"><span style="flex:1">${esc(k)}</span>${EQD[k]===undefined?`<button ${rm} onclick="event.preventDefault();eqDel(${i})">Remove</button>`:''}</label>`).join('')}
+ <label for="neq" style="margin-top:12px">Add equipment</label><div class="btns" style="margin-top:4px"><input id="neq" type="text" placeholder="Cable machine, TRX, sandbag…" onkeydown="if(event.key==='Enter')eqAdd()"><button style="flex:none" onclick="eqAdd()">Add</button></div></div>
+ <div class="card"><h2>Movements</h2><div class="dim small">Untick a movement to stop it being suggested. Your own can be removed.</div>
+ ${all.map((a,i)=>`<label class="ck"><input type="checkbox" ${S.hide.includes(a.n)?'':'checked'} onchange="mvHide(${i},this.checked)"><span style="flex:1">${esc(a.n)}<div class="dim small">${esc(a.q||'Bodyweight')}</div></span>${i>=ACC.length?`<button ${rm} onclick="event.preventDefault();mvRemove(${i-ACC.length})">Remove</button>`:''}</label>`).join('')}
+ <button class="wide" onclick="mvSheet()">+ Add movement</button></div>`}
+function eqKeys(){return Object.keys(S.eq).filter(k=>k!=='Bodyweight')}
+function eqSet(i,v){S.eq[eqKeys()[i]]=v;save()}
+function eqDel(i){delete S.eq[eqKeys()[i]];save();render()}
+function eqAdd(){const v=$('neq').value.trim();if(!v||S.eq[v]!==undefined)return;S.eq[v]=true;save();render()}
+function mvHide(i,v){const a=[...ACC,...S.myAcc][i];S.hide=S.hide.filter(n=>n!==a.n);if(!v)S.hide.push(a.n);save()}
+function mvRemove(i){const a=S.myAcc.splice(i,1)[0];if(a)S.hide=S.hide.filter(n=>n!==a.n);save();render()}
+function mvSheet(){sheet(`<h2>Add movement</h2><label for="nn">Name</label><input id="nn" type="text" placeholder="Sumo Deadlift">
+ <label for="nf" style="margin-top:10px">Muscle group</label><select id="nf">${FAMS.map(f=>`<option value="${f[1]}">${f[0]}</option>`).join('')}</select>
+ <label for="nq" style="margin-top:10px">Equipment</label><select id="nq">${['Bodyweight',...eqKeys()].map(k=>`<option>${esc(k)}</option>`).join('')}</select>
+ <div class="row"><div><label for="ns">Sets</label><input id="ns" inputmode="numeric" value="3"></div><div><label for="nr">Reps</label><input id="nr" value="10"></div><div><label for="nu">Per</label><input id="nu" placeholder="per side"></div></div>
+ <div class="btns"><button onclick="closeSheet()">Cancel</button><button class="pri" style="margin:0;font-size:18px;min-height:50px" onclick="mvSave()">Add</button></div>`)}
+function mvSave(){const n=$('nn').value.trim();if(!n)return;if([...ACC,...S.myAcc].some(a=>a.n.toLowerCase()===n.toLowerCase()))return msg('That movement is already in the list.');const q=$('nq').value;S.myAcc.push({n,f:$('nf').value,s:$('ns').value.trim()||'3',r:$('nr').value.trim()||'10',u:$('nu').value.trim(),eq:q,q});save();closeSheet();render()}
+function qpPrev(v){const n=parseInt(v);$('qpv').textContent=n>0?'#'+n+': '+at(n-1).move:''}
+function setPos(){const n=parseInt($('qp').value);if(!(n>=1))return msg('Enter a queue number, 1 or higher.');const m=at(n-1).move;confirmSheet(`Set current workout to #${n}: ${m}?`,'Set',()=>{S.pos=n-1;save();render()})}
+function undoAdv(){const i=S.log.map(x=>x.type).lastIndexOf('primary');if(i<0)return;const e=S.log.splice(i,1)[0];S.pos=e.pos;const g=y=>(y.type==='secondary'||y.type==='metcon')&&y.t>e.t&&y.t<=e.t+20;const sx=S.log.filter(y=>y.type==='secondary'&&g(y));Object.assign(S.draft,{pw:e.w,ps:e.s,pr:e.r,pn:e.n,pv:e.variation||''});if(sx.length)S.draft.si=sx.map(y=>({n:y.move,w:y.w,s:y.s,r:y.r,nt:y.n}));S.log=S.log.filter(y=>!g(y));save();view='home';render()}
+
+function msg(t){sheet(`<h2>${esc(t)}</h2><button class="wide" onclick="closeSheet()">OK</button>`)}
+function exportXlsx(){
+ if(!window.XLSX)return msg('The Excel library did not load. Check your connection and try again.');
+ const H=['Date','Type','Movement','Variation','Workout','Slot','Queue Position','Weight','Sets','Reps','Notes'];
+ const hist=[...S.log].sort((a,b)=>a.t-b.t).map(e=>({Date:new Date(e.t).toISOString(),Type:e.type,Movement:e.move,Variation:e.variation||'',Workout:e.wk||'',Slot:e.slot||'','Queue Position':e.pos==null?'':e.pos+1,Weight:e.w??'',Sets:e.s??'',Reps:e.r??'',Notes:e.n||''}));
+ const rot=S.slots.flatMap(s=>s.moves.map((m,j)=>({Slot:s.name,Order:j+1,Movement:m})));
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(hist,{header:H}),'History');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rot,{header:['Slot','Order','Movement']}),'Rotation');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(libRows(),{header:['Name','Type','Details']}),'Library');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([{Setting:'Primaries completed (queue position)',Value:S.pos}],{header:['Setting','Value']}),'State');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(Object.keys(S.eq).map(k=>({Equipment:k,On:S.eq[k]?'Yes':'No'})),{header:['Equipment','On']}),'Equipment');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.myAcc.map(a=>({Name:a.n,Family:a.f,Sets:a.s,Reps:a.r,Per:a.u||'',Equipment:a.q})),{header:['Name','Family','Sets','Reps','Per','Equipment']}),'Movements');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.hide.map(n=>({Name:n})),{header:['Name']}),'Hidden');
+ XLSX.writeFile(wb,'leah-lift-'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+function importXlsx(inp){
+ const f=inp.files[0];inp.value='';if(!f)return;
+ if(!window.XLSX)return msg('The Excel library did not load. Check your connection and try again.');
+ const rd=new FileReader();
+ rd.onerror=()=>msg('Could not read that file.');
+ rd.onload=()=>{try{
+  const wb=XLSX.read(new Uint8Array(rd.result),{type:'array'}),rows=n=>wb.Sheets[n]?XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:''}):null;
+  const H=rows('History'),R=rows('Rotation'),St=rows('State'),LB=rows('Library');
+  if(!H&&!R)return msg('No History or Rotation sheet found. Use a file made by Export.');
+  let pc=0;
+  const log=(H||[]).filter(r=>r.Movement!==''&&TAGS[r.Type]).map((r,i)=>{
+   let t=typeof r.Date==='number'?Math.round((r.Date-25569)*864e5):new Date(r.Date).getTime();if(!isFinite(t))t=Date.now()+i;
+   const e={id:t+i,type:r.Type,t,move:String(r.Movement),w:r.Weight,s:r.Sets,r:r.Reps,n:String(r.Notes||'')};if(r.Variation)e.variation=String(r.Variation);if(r.Workout)e.wk=String(r.Workout);
+   if(r.Type==='primary'){const p=Number(r['Queue Position'])-1;e.pos=isFinite(p)&&r['Queue Position']!==''?p:pc;e.slot=String(r.Slot||'');pc++}
+   return e});
+  let slots=S.slots;
+  if(R&&R.length){const g=new Map();R.filter(r=>r.Slot!==''&&r.Movement!=='').forEach(r=>{if(!g.has(r.Slot))g.set(r.Slot,[]);g.get(r.Slot).push({o:Number(r.Order)||0,m:String(r.Movement)})});
+   slots=[...g].map(([n,a])=>({name:String(n),moves:a.sort((x,y)=>x.o-y.o).map(x=>x.m)}));}
+  if(!slots.length)return msg('The Rotation sheet has no movements.');
+  const sp=St&&St[0]&&St[0].Value!==''?Number(St[0].Value):NaN,pos=isFinite(sp)&&sp>=0?Math.floor(sp):pc;
+  window._imp={log,slots,pos};if(LB)window._imp.lib=parseLib(LB);
+  const EQr=rows('Equipment'),MVr=rows('Movements'),HDr=rows('Hidden');
+  if(EQr&&EQr.length){const e={};EQr.forEach(r=>{if(r.Equipment!=='')e[String(r.Equipment)]=/^y/i.test(String(r.On))});window._imp.eq=e}
+  if(MVr)window._imp.myAcc=MVr.filter(r=>r.Name!=='').map(r=>({n:String(r.Name),f:String(r.Family),s:String(r.Sets),r:String(r.Reps),u:String(r.Per||''),q:String(r.Equipment||'Bodyweight'),eq:String(r.Equipment||'Bodyweight')}));
+  if(HDr)window._imp.hide=HDr.map(r=>String(r.Name)).filter(Boolean);
+  confirmSheet(`Replace everything with ${log.length} history entries, ${slots.reduce((a,s)=>a+s.moves.length,0)} movements and queue position ${pos+1}?`,'Import',()=>{Object.assign(S,window._imp);S.draft={};save();view='home';render()},true);
+ }catch(e){msg('That file could not be read as a workout export.')}};
+ rd.readAsArrayBuffer(f);
+}
+function parseLib(rows){const g=(r,k)=>{const key=Object.keys(r).find(x=>x.trim().toLowerCase()===k);return key?r[key]:''};
+ return rows.map((r,i)=>{const t=String(g(r,'name')).trim();if(!t)return null;
+  let l=String(g(r,'details')||g(r,'workout')).split(/\r?\n|\||;/).map(x=>x.trim()).filter(Boolean);if(!l.length)l=[t];
+  return{id:Date.now()+i+Math.floor(Math.random()*1e4),t,l,p:/partner/i.test(String(g(r,'type')))}}).filter(Boolean)}
+function applyLib(items){let add=0,upd=0;items.forEach(w=>{const x=S.lib.find(y=>y.t.toLowerCase()===w.t.toLowerCase());if(x){x.l=w.l;x.p=w.p;upd++}else{S.lib.push(w);add++}});save();return [add,upd]}
+function libRows(){return (S.lib||[]).map(w=>({Name:w.t,Type:w.p?'Partner':'Solo',Details:w.l.join(' | ')}))}
+function libTemplate(){if(!window.XLSX)return msg('The Excel library did not load. Check your connection and try again.');
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([{Name:'Hotel Room AMRAP',Type:'Solo',Details:'12-minute AMRAP | 10 push-ups | 15 air squats | 20 sit-ups'},{Name:'Partner Relay',Type:'Partner',Details:'10 minutes | You go, I go | 10 burpees | 200m run'}],{header:['Name','Type','Details']}),'Library');XLSX.writeFile(wb,'leah-lift-library-template.xlsx')}
+function libExport(){if(!window.XLSX)return msg('The Excel library did not load. Check your connection and try again.');
+ if(!S.lib.length)return msg('Your library is empty. Get the template to start one.');
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(libRows(),{header:['Name','Type','Details']}),'Library');XLSX.writeFile(wb,'leah-lift-library-'+ymd(Date.now())+'.xlsx')}
+function libImport(inp){const f=inp.files[0];inp.value='';if(!f)return;
+ if(!window.XLSX)return msg('The Excel library did not load. Check your connection and try again.');
+ const rd=new FileReader();rd.onerror=()=>msg('Could not read that file.');
+ rd.onload=()=>{try{const wb=XLSX.read(new Uint8Array(rd.result),{type:'array'}),sh=wb.Sheets['Library']||wb.Sheets[wb.SheetNames[0]];
+  const items=parseLib(XLSX.utils.sheet_to_json(sh,{defval:''}));
+  if(!items.length)return msg('No workouts found. Use the columns Name, Type and Details.');
+  const upd=items.filter(w=>S.lib.some(y=>y.t.toLowerCase()===w.t.toLowerCase())).length;window._lib=items;
+  confirmSheet(`Add ${items.length-upd} new and update ${upd} existing workout${items.length===1?'':'s'}?`,'Import',()=>{applyLib(window._lib);render()})
+ }catch(e){msg('That file could not be read.')}};rd.readAsArrayBuffer(f)}
+function libSheet(id){const w=id?S.lib.find(x=>x.id===id):null;
+ sheet(`<h2>${w?'Edit workout':'Add workout'}</h2>
+ <label for="ln">Name</label><input id="ln" type="text" value="${esc(w?w.t:'')}" placeholder="Cindy, Hotel room AMRAP…">
+ <label for="lp" style="margin-top:10px">Type</label><select id="lp"><option value="solo" ${w&&w.p?'':'selected'}>Solo</option><option value="partner" ${w&&w.p?'selected':''}>Partner</option></select>
+ <label for="ld" style="margin-top:10px">Details (one line per movement)</label><textarea id="ld" style="min-height:120px" placeholder="12-minute AMRAP&#10;10 push-ups&#10;15 air squats">${esc(w?w.l.join('\n'):'')}</textarea>
+ <div class="btns">${w?`<button class="danger" onclick="libDel(${id})">Delete</button>`:''}<button onclick="closeSheet()">Cancel</button><button class="pri" style="margin:0;font-size:18px;min-height:50px" onclick="libSave(${id||0})">Save</button></div>`)}
+function libSave(id){const t=$('ln').value.trim();if(!t)return;
+ const l=$('ld').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean),p=$('lp').value==='partner',x=id?S.lib.find(y=>y.id===id):S.lib.find(y=>y.t.toLowerCase()===t.toLowerCase());
+ if(x){x.t=t;x.l=l.length?l:[t];x.p=p}else S.lib.push({id:Date.now(),t,l:l.length?l:[t],p});
+ save();closeSheet();render()}
+function libDel(id){confirmSheet('Delete this workout from your library? Logged history is kept.','Delete',()=>{S.lib=S.lib.filter(x=>x.id!==id);save();render()},true)}
+function library(){const L=[...(S.lib||[])].sort((a,b)=>a.t.localeCompare(b.t));
+ return `<button style="min-height:44px;padding:8px 14px" onclick="view='settings';render()">← Back</button>
+ <h2 style="margin-top:12px">Workout library</h2>
+ <div class="dim small">Your own workouts. They join the finisher suggestions (least recently done come up first) and you can pick one by hand with Choose.</div>
+ <button class="pri" style="font-size:20px;min-height:56px" onclick="libSheet()">+ ADD WORKOUT</button>
+ <div class="card"><h2>Bulk upload</h2><div class="dim small">Excel or CSV with columns Name, Type (Solo or Partner) and Details (separate lines with |). Matching names are updated, new ones are added.</div>
+ <div class="btns"><button onclick="libTemplate()">Get template</button><button onclick="libExport()">Export library</button></div>
+ <input id="lf" type="file" accept=".xlsx,.xls,.csv" hidden onchange="libImport(this)"><button class="wide" onclick="$('lf').click()">Upload file</button></div>
+ ${L.length?`<ul class="l">${L.map(w=>`<li onclick="libSheet(${w.id})"><b>${esc(w.t)}</b><span class="tag">${w.p?'Partner':'Solo'}</span><div class="dim small">${esc(w.l.join(' · '))}</div></li>`).join('')}</ul>`:'<p class="dim">Nothing saved yet.</p>'}`}
+function pickSheet(){window._pool=poolAll();sheet(`<h2>Choose a workout</h2><input id="pq" type="text" placeholder="Search" oninput="pickList(this.value)" style="margin:8px 0"><div id="pl"></div>`);pickList('')}
+function pickList(q){q=q.trim().toLowerCase();const P=window._pool.map((m,i)=>({m,i})).filter(({m})=>!q||(m.t+' '+m.l.join(' ')).toLowerCase().includes(q));
+ const sec=(h,a)=>a.length?`<div class="dim small" style="margin-top:12px">${h}</div><ul class="l">${a.map(({m,i})=>{const ld=lastDone(m);return `<li onclick="chooseMc(${i})"><b>${esc(m.t)}</b><span class="tag">${m.p?'Partner':'Solo'}</span><div class="dim small">${esc(m.l.join(' · ').slice(0,90))}${ld?' · last '+fd(ld):''}</div></li>`}).join('')}</ul>`:'';
+ $('pl').innerHTML=(sec('My library',P.filter(x=>x.m.lib))+sec('Built-in',P.filter(x=>!x.m.lib)))||'<p class="dim">No matches.</p>'}
+function chooseMc(i){const m=window._pool[i];S.mc={t:m.t,l:[...m.l],p:!!m.p,lib:!!m.lib};S.mode=S.mc.p?'partner':'solo';S.metconSkipped=false;delete S.draft.mo;save();closeSheet();render()}
+function best(a){const w=a.map(e=>parseFloat(e.w)).filter(isFinite);return w.length?Math.max(...w):null}
+function chart(p){if(p.length<2)return '';
+ const W=320,H=140,P=30,xs=p.map(q=>q.t),x0=Math.min(...xs),x1=Math.max(...xs),ws=p.map(q=>q.w),lo=Math.min(...ws),hi=Math.max(...ws);
+ const X=t=>P+(x1===x0?0:(t-x0)/(x1-x0))*(W-P*2),Y=w=>H-P-(hi===lo?.5:(w-lo)/(hi-lo))*(H-P*2);
+ const pts=p.map(q=>X(q.t).toFixed(1)+','+Y(q.w).toFixed(1)).join(' ');
+ return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin:10px 0" role="img" aria-label="Weight over time"><polyline points="${pts}" fill="none" style="stroke:var(--acc);stroke-width:2.5"/>${p.map(q=>`<circle cx="${X(q.t).toFixed(1)}" cy="${Y(q.w).toFixed(1)}" r="4" style="fill:var(--acc)"/>`).join('')}<g style="fill:var(--dim);font-size:11px"><text x="2" y="${(Y(hi)+4).toFixed(1)}">${hi}</text>${hi!==lo?`<text x="2" y="${(Y(lo)+4).toFixed(1)}">${lo}</text>`:''}<text x="${P}" y="${H-6}">${fd(x0)}</text><text x="${W-P}" y="${H-6}" text-anchor="end">${fd(x1)}</text></g></svg>`}
+function progDetail(){
+ if(pg.k==='w'){const rows=S.log.filter(e=>(e.type==='metcon'||e.type==='random'||e.type==='extra')&&wkey(e)===pg.name).sort((a,b)=>b.t-a.t);
+  if(!rows.length)return `<button style="min-height:44px;padding:8px 14px" onclick="pg=null;render()">← Back</button><p class="dim">No sessions yet.</p>`;
+  return `<button style="min-height:44px;padding:8px 14px" onclick="pg=null;render()">← Back</button>
+  <h2 style="margin-top:12px">${esc(String(rows[rows.length-1].wk||rows[rows.length-1].move).slice(0,80))}</h2>
+  <div class="dim">${rows.length} time${rows.length===1?'':'s'} · most recent ${fd(rows[0].t)}</div>
+  <ul class="l">${rows.map(e=>`<li onclick="detail(${e.id})"><b>${fd(e.t)}</b> ${esc(e.n||'No result noted')}<span class="tag">${TAGS[e.type]}</span></li>`).join('')}</ul>`}
+ const f=pg.k==='f',rows=(f?S.log.filter(e=>e.type==='primary'&&e.move===pg.name):lifts().filter(e=>nameOf(e)===pg.name)).sort((a,b)=>a.t-b.t);
+ const pts=rows.map(e=>({t:e.t,w:parseFloat(e.w)})).filter(q=>isFinite(q.w)),b=best(rows);
+ return `<button style="min-height:44px;padding:8px 14px" onclick="pg=null;render()">← Back</button>
+ <h2 style="margin-top:12px">${esc(pg.name)}${f?' · all variations':''}</h2>
+ <div class="dim">${rows.length} session${rows.length===1?'':'s'}${b!=null?' · best weight '+b:''}</div>
+ ${chart(pts)}
+ ${rows.length?`<ul class="l">${[...rows].reverse().map(e=>`<li onclick="detail(${e.id})"><b>${fd(e.t)}</b> ${esc(fmtSet(e))}<span class="tag ${e.type==='primary'?'p':''}">${TAGS[e.type]}</span>${f&&e.variation?`<div class="dim">${esc(e.variation)}</div>`:''}${e.n?`<div class="dim small">${esc(e.n)}</div>`:''}</li>`).join('')}</ul>`:'<p class="dim">No sessions yet.</p>'}`}
+function progress(){
+ if(pg)return progDetail();
+ pgNames=[];const ref=n=>{pgNames.push(n);return pgNames.length-1};
+ const L=lifts(),W=new Map();
+ S.log.filter(e=>e.type==='metcon'||e.type==='random'||e.type==='extra').forEach(e=>{const k=wkey(e);if(!W.has(k))W.set(k,[]);W.get(k).push(e)});
+ if(!L.length&&!W.size)return `<h2>Progress</h2><p class="dim">Log a lift or workout and its progression shows up here.</p>`;
+ const of=n=>L.filter(e=>nameOf(e)===n).sort((x,y)=>x.t-y.t);
+ const lastT=n=>of(n).pop().t;
+ const stat=n=>{const a=of(n),l=a[a.length-1],b=best(a);return `<div class="dim small">${a.length} session${a.length>1?'s':''} · last ${esc(fmtSet(l))}${b!=null?' · best '+b:''}</div>`};
+ const row=n=>`<li onclick="showProg('v',${ref(n)})"><b>${esc(n)}</b>${stat(n)}</li>`;
+ const foc=new Map(),sec=new Set();
+ L.forEach(e=>{if(e.type==='primary'){if(!foc.has(e.move))foc.set(e.move,new Set());foc.get(e.move).add(nameOf(e))}else sec.add(e.move)});
+ const newest=ns=>Math.max(...[...ns].map(lastT));
+ const cards=[...foc].sort((a,b)=>newest(b[1])-newest(a[1])).map(([f,ns])=>`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>${esc(f)}</h2>${ns.size>1||!ns.has(f)?`<button style="min-height:36px;padding:4px 12px;font-size:14px" onclick="showProg('f',${ref(f)})">All variations</button>`:''}</div><ul class="l">${[...ns].sort((a,b)=>lastT(b)-lastT(a)).map(row).join('')}</ul></div>`).join('');
+ const sc=sec.size?`<div class="card sub"><h2>Secondary lifts</h2><ul class="l">${[...sec].sort((a,b)=>lastT(b)-lastT(a)).map(row).join('')}</ul></div>`:'';
+ const wk=W.size?`<div class="card"><h2>Workouts</h2><ul class="l">${[...W].sort((a,b)=>Math.max(...b[1].map(e=>e.t))-Math.max(...a[1].map(e=>e.t))).map(([k,a])=>{a.sort((x,y)=>y.t-x.t);return `<li onclick="showProg('w',${ref(k)})"><b>${esc(String(a[a.length-1].wk||a[a.length-1].move).slice(0,60))}</b><div class="dim small">${a.length} time${a.length>1?'s':''} · last ${fd(a[0].t)}${a[0].n?' · '+esc(a[0].n.slice(0,40)):''}</div></li>`}).join('')}</ul></div>`:'';
+ return `<h2>Progress</h2><div class="dim small">Tap a movement or workout to see how it has progressed.</div>${cards}${sc}${wk}`}
+function fillList(){const set=new Set([...S.slots.flatMap(x=>x.moves),...allAcc().map(a=>a.n),'Romanian Deadlift','Hang Clean','Squat Clean','Power Clean','Rows',...lifts().map(nameOf)]);$('mvlist').innerHTML=[...set].filter(Boolean).map(n=>`<option value="${esc(n)}">`).join('')}
+function render(){
+ fillList();$('app').innerHTML=view==='home'?home():view==='history'?history():view==='progress'?progress():view==='library'?library():view==='gear'?gear():settings();
+ $('nav').innerHTML=[['home','Today'],['history','History'],['progress','Progress'],['gear','Gear'],['settings','Rotation']].map(([v,l])=>`<button class="${view===v||(v==='settings'&&view==='library')?'on':''}" onclick="view='${v}';pg=null;render();scrollTo(0,0)">${l}</button>`).join('')}
+render();
+</script>
+</body>
+</html>
