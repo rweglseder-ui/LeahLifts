@@ -44,7 +44,7 @@ button.alt{background:var(--alt);color:#06222a;border-color:var(--alt);width:100
 label.ck{display:flex;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);font-size:18px;color:var(--tx)}
 label.ck input{width:26px;height:26px;padding:0;flex:none;accent-color:var(--acc)}
 nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
-nav button{flex:1;border:0;border-radius:0;background:none;min-height:60px;color:var(--dim)}
+nav button{flex:1;border:0;border-radius:0;background:none;min-height:60px;color:var(--dim);font-size:13px;padding:14px 0}
 nav button.on{color:var(--acc)}
 #sheet{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-end;justify-content:center;z-index:9}
 #sheet.open{display:flex}
@@ -59,8 +59,9 @@ pre{white-space:pre-wrap;font:inherit;margin:6px 0}
 <nav id="nav"></nav>
 <script>
 const KEY='leahlift.v1';
-const VER='v4';
+const VER='v5';
 const CHANGES=[
+ ['v5','Nov 16, 2026','New Nutrition tracker (daily calories and macros, four meals, saved foods, goals) and new Yoga & Mobility library with logging. Both are separate from the lifting rotation and included in the Excel backup. Gear and Rotation moved under More.'],
  ['v4','Nov 15, 2026','Home workouts now count as the scheduled focus. Your home pick is logged as the primary (tagged Home), so the queue and progression advance whether you train at home or at the gym.'],
  ['v3','Nov 15, 2026','Home Workout mode: home options for each focus plus Pull and Core, logged without moving the rotation. Treadmill finishers. Easing-back note. Push-ups no longer default to max reps. Version and change history shown in the app.'],
  ['v2','Nov 15, 2026','Built from Next Lift v11. Add, remove and reorder movements in Rotation. Gear tab for equipment and your own movements. Pump tracks. Solo stamina finishers.'],
@@ -183,6 +184,8 @@ let S,view='home',mem=null,pg=null,pgNames=[];
 function load(){try{const r=localStorage.getItem(KEY);if(r)return JSON.parse(r)}catch(e){}return mem?JSON.parse(mem):JSON.parse(JSON.stringify(DEF))}
 function save(){const j=JSON.stringify(S);mem=j;try{localStorage.setItem(KEY,j)}catch(e){}}
 S=load();if(!S.eq)S.eq={...EQD};if(!S.myAcc)S.myAcc=[];if(!S.hide)S.hide=[];
+if(!S.nut)S.nut={goals:{cal:'',p:'',c:'',f:''},foods:[],days:{}};if(!S.nut.goals)S.nut.goals={cal:'',p:'',c:'',f:''};if(!S.nut.foods)S.nut.foods=[];if(!S.nut.days)S.nut.days={};
+if(!S.yoga)S.yoga={custom:[],log:[]};if(!S.yoga.custom)S.yoga.custom=[];if(!S.yoga.log)S.yoga.log=[];
 if((S.ver||0)<3){if(S.eq['Treadmill']===undefined)S.eq['Treadmill']=true;S.eq['Resistance bands']=true;S.ver=3;save()}
 function allAcc(){return [...ACC,...S.myAcc].filter(a=>!S.hide.includes(a.n))}
 function eqOn(q){return !q||q==='Bodyweight'||S.eq[q]===true}
@@ -458,6 +461,12 @@ function exportXlsx(){
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(Object.keys(S.eq).map(k=>({Equipment:k,On:S.eq[k]?'Yes':'No'})),{header:['Equipment','On']}),'Equipment');
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.myAcc.map(a=>({Name:a.n,Family:a.f,Sets:a.s,Reps:a.r,Per:a.u||'',Equipment:a.q})),{header:['Name','Family','Sets','Reps','Per','Equipment']}),'Movements');
  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.hide.map(n=>({Name:n})),{header:['Name']}),'Hidden');
+ const NG=S.nut.goals;
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(Object.entries(S.nut.days).flatMap(([d,a])=>a.map(e=>({Date:d,Meal:e.meal,Food:e.n,Serving:e.srv||'',Servings:e.q,Calories:e.cal,Protein:e.p,Carbs:e.c,Fat:e.f}))),{header:['Date','Meal','Food','Serving','Servings','Calories','Protein','Carbs','Fat']}),'Nutrition Entries');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.nut.foods.map(f=>({Name:f.n,Serving:f.srv||'',Calories:f.cal,Protein:f.p,Carbs:f.c,Fat:f.f})),{header:['Name','Serving','Calories','Protein','Carbs','Fat']}),'Saved Foods');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([{Calories:NG.cal,Protein:NG.p,Carbs:NG.c,Fat:NG.f}],{header:['Calories','Protein','Carbs','Fat']}),'Nutrition Goals');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.yoga.custom.map(r=>({Id:r.id,Name:r.n,Type:r.type,Minutes:r.mins,Focus:r.focus.join(', '),Equipment:r.eq.join(', '),Steps:r.steps.join('\n'),Gentler:r.easy||'',Notes:r.note||''})),{header:['Id','Name','Type','Minutes','Focus','Equipment','Steps','Gentler','Notes']}),'Yoga Routines');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.yoga.log.map(e=>({Date:new Date(e.t).toISOString(),Routine:e.n,Type:e.type,Minutes:e.mins,Notes:e.nt||'',RoutineId:e.rid||''})),{header:['Date','Routine','Type','Minutes','Notes','RoutineId']}),'Yoga Log');
  XLSX.writeFile(wb,'leah-lift-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 function importXlsx(inp){
@@ -485,7 +494,17 @@ function importXlsx(inp){
   if(EQr&&EQr.length){const e={};EQr.forEach(r=>{if(r.Equipment!=='')e[String(r.Equipment)]=/^y/i.test(String(r.On))});window._imp.eq=e}
   if(MVr)window._imp.myAcc=MVr.filter(r=>r.Name!=='').map(r=>({n:String(r.Name),f:String(r.Family),s:String(r.Sets),r:String(r.Reps),u:String(r.Per||''),q:String(r.Equipment||'Bodyweight'),eq:String(r.Equipment||'Bodyweight')}));
   if(HDr)window._imp.hide=HDr.map(r=>String(r.Name)).filter(Boolean);
-  confirmSheet(`Replace everything with ${log.length} history entries, ${slots.reduce((a,s)=>a+s.moves.length,0)} movements and queue position ${pos+1}?`,'Import',()=>{Object.assign(S,window._imp);S.draft={};save();view='home';render()},true);
+  const NE=rows('Nutrition Entries'),SF=rows('Saved Foods'),NGr=rows('Nutrition Goals'),YR=rows('Yoga Routines'),YL=rows('Yoga Log'),base=Date.now()*1000;let k=0;const nx=()=>base+k++;
+  if(NE||SF||NGr){const n=JSON.parse(JSON.stringify(S.nut));
+   if(NE){n.days={};NE.filter(r=>r.Food!==''&&r.Date!=='').forEach(r=>{const d=String(r.Date).slice(0,10);(n.days[d]=n.days[d]||[]).push({id:nx(),meal:MEALS.some(m=>m[0]===r.Meal)?String(r.Meal):'snacks',n:String(r.Food),srv:String(r.Serving||''),q:nNum(r.Servings)||1,cal:nNum(r.Calories),p:nNum(r.Protein),c:nNum(r.Carbs),f:nNum(r.Fat)})})}
+   if(SF)n.foods=SF.filter(r=>r.Name!=='').map(r=>({id:nx(),n:String(r.Name),srv:String(r.Serving||''),cal:nNum(r.Calories),p:nNum(r.Protein),c:nNum(r.Carbs),f:nNum(r.Fat)}));
+   if(NGr&&NGr[0]){const g=v=>v===''?'':nNum(v);n.goals={cal:g(NGr[0].Calories),p:g(NGr[0].Protein),c:g(NGr[0].Carbs),f:g(NGr[0].Fat)}}
+   window._imp.nut=n}
+  if(YR||YL){const y=JSON.parse(JSON.stringify(S.yoga));
+   if(YR)y.custom=YR.filter(r=>r.Name!==''&&r.Steps!=='').map(r=>({id:/^c\d+$/.test(String(r.Id))?String(r.Id):'c'+nx(),n:String(r.Name),type:YTYPES.includes(r.Type)?String(r.Type):'Mobility',mins:Math.round(nNum(r.Minutes))||10,focus:String(r.Focus||'').split(',').map(x=>x.trim()).filter(Boolean),eq:String(r.Equipment||'').split(',').map(x=>x.trim()).filter(Boolean),steps:String(r.Steps).split('\n').map(x=>x.trim()).filter(Boolean),easy:String(r.Gentler||''),note:String(r.Notes||'')}));
+   if(YL)y.log=YL.filter(r=>r.Routine!=='').map(r=>{let t=typeof r.Date==='number'?Math.round((r.Date-25569)*864e5):new Date(r.Date).getTime();if(!isFinite(t))t=Date.now();return{id:t+(k++%1000),t,rid:String(r.RoutineId||''),n:String(r.Routine),type:String(r.Type||'Mobility'),mins:Math.round(nNum(r.Minutes))||1,nt:String(r.Notes||'')}});
+   window._imp.yoga=y}
+  confirmSheet(`Replace everything with ${log.length} history entries, ${slots.reduce((a,s)=>a+s.moves.length,0)} movements and queue position ${pos+1}?${window._imp.nut||window._imp.yoga?' Nutrition and yoga data found in the file will be restored too; anything the file does not include is kept.':''}`,'Import',()=>{Object.assign(S,window._imp);S.draft={};save();view='home';render()},true);
  }catch(e){msg('That file could not be read as a workout export.')}};
  rd.readAsArrayBuffer(f);
 }
@@ -571,10 +590,121 @@ function progress(){
  const sc=sec.size?`<div class="card sub"><h2>Secondary lifts</h2><ul class="l">${[...sec].sort((a,b)=>lastT(b)-lastT(a)).map(row).join('')}</ul></div>`:'';
  const wk=W.size?`<div class="card"><h2>Workouts</h2><ul class="l">${[...W].sort((a,b)=>Math.max(...b[1].map(e=>e.t))-Math.max(...a[1].map(e=>e.t))).map(([k,a])=>{a.sort((x,y)=>y.t-x.t);return `<li onclick="showProg('w',${ref(k)})"><b>${esc(String(a[a.length-1].wk||a[a.length-1].move).slice(0,60))}</b><div class="dim small">${a.length} time${a.length>1?'s':''} · last ${fd(a[0].t)}${a[0].n?' · '+esc(a[0].n.slice(0,40)):''}</div></li>`}).join('')}</ul></div>`:'';
  return `<h2>Progress</h2><div class="dim small">Tap a movement or workout to see how it has progressed.</div>${cards}${sc}${wk}`}
+/* ===== Nutrition: separate from workout data (S.nut) ===== */
+let nutD=ymd(Date.now());
+const MEALS=[['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snacks','Snacks']];
+const nNum=v=>{const x=parseFloat(v);return isFinite(x)&&x>=0?x:0};
+const nR1=x=>Math.round(x*10)/10;
+const nid=()=>Date.now()*1000+Math.floor(Math.random()*1000);
+function nutTot(a){const t={cal:0,p:0,c:0,f:0};a.forEach(e=>{const q=e.q||1;t.cal+=e.cal*q;t.p+=e.p*q;t.c+=e.c*q;t.f+=e.f*q});return t}
+function nutShift(n){const [y,m,d]=nutD.split('-').map(Number);nutD=ymd(new Date(y,m-1,d+n).getTime());render()}
+function nutGo(v){if(v){nutD=v;render()}}
+function nutBar(lab,v,g,unit){const has=Number(g)>0,pct=has?Math.min(100,v/g*100):0;
+ return `<div style="margin:10px 0"><div style="display:flex;justify-content:space-between"><span>${lab}</span><span class="dim small">${nR1(v)}${has?' / '+nR1(Number(g)):''} ${unit}${has?'':' · no goal'}</span></div><div style="height:10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${pct}%;background:${has&&v>g?'var(--bad)':'var(--acc)'}"></div></div></div>`}
+function nutrition(){const G=S.nut.goals,L=S.nut.days[nutD]||[],T=nutTot(L),gc=Number(G.cal)>0?Number(G.cal):0,isT=nutD===ymd(Date.now()),rem=Math.round(gc-T.cal);
+ return `<div style="display:flex;justify-content:space-between;align-items:center"><h2>Nutrition</h2><button style="min-height:44px;padding:8px 14px" onclick="nutGoals()">Goals</button></div>
+ <div class="btns" style="align-items:center"><button style="flex:none;padding:8px 18px" aria-label="Previous day" onclick="nutShift(-1)">‹</button><input type="date" value="${nutD}" onchange="nutGo(this.value)" style="text-align:center"><button style="flex:none;padding:8px 18px" aria-label="Next day" onclick="nutShift(1)">›</button></div>
+ ${isT?'':`<button class="wide" style="min-height:40px" onclick="nutGo(ymd(Date.now()))">Back to today</button>`}
+ <div class="trio" style="margin-top:12px"><div><span class="dim small">Goal</span><b>${gc||'Not set'}</b></div><div class="cur"><span class="dim small">Eaten</span><b>${Math.round(T.cal)}</b></div><div><span class="dim small">${gc&&rem<0?'Over':'Remaining'}</span><b style="${gc&&rem<0?'color:var(--bad)':''}">${gc?Math.abs(rem):'–'}</b></div></div>
+ <div class="card">${nutBar('Calories',T.cal,G.cal,'kcal')}${nutBar('Protein',T.p,G.p,'g')}${nutBar('Carbs',T.c,G.c,'g')}${nutBar('Fat',T.f,G.f,'g')}</div>
+ <button class="pri" onclick="nutAdd()">ADD FOOD</button>
+ ${MEALS.map(([k,lab])=>{const a=L.filter(e=>e.meal===k),t=nutTot(a);return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>${lab}</h2><span class="dim">${Math.round(t.cal)} kcal</span></div>${a.length?`<ul class="l">${a.map(e=>`<li onclick="nutEdit(${e.id})">${esc(e.n)}<div class="dim small">${nR1(e.q)} × ${esc(e.srv||'serving')} · ${Math.round(e.cal*e.q)} kcal · P ${nR1(e.p*e.q)} · C ${nR1(e.c*e.q)} · F ${nR1(e.f*e.q)}</div></li>`).join('')}</ul>`:''}<button class="wide" onclick="nutAdd('${k}')">+ Add food</button></div>`}).join('')}
+ <button class="wide" onclick="foodList()">My foods (${S.nut.foods.length})</button>`}
+function nutDate(){const [y,m,d]=nutD.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})}
+function defMeal(){const h=new Date().getHours();return h<11?'breakfast':h<15?'lunch':h<21?'dinner':'snacks'}
+function nutRecent(){const seen=new Set(),out=[];Object.values(S.nut.days).flat().sort((a,b)=>b.id-a.id).forEach(e=>{const k=(e.n+'|'+(e.srv||'')).toLowerCase();if(!seen.has(k)&&out.length<8){seen.add(k);out.push({n:e.n,srv:e.srv,cal:e.cal,p:e.p,c:e.c,f:e.f})}});return out}
+function foodFields(f){f=f||{};return `<label for="fn">Food</label><input id="fn" type="text" value="${esc(f.n)}" placeholder="Greek yogurt" oninput="nutSug()" autocomplete="off">
+ <label for="fs" style="margin-top:10px">Serving size</label><input id="fs" type="text" value="${esc(f.srv)}" placeholder="1 cup, 100 g, 1 slice">
+ <div class="row" style="grid-template-columns:repeat(2,1fr)"><div><label for="fc">Calories</label><input id="fc" inputmode="decimal" value="${esc(f.cal)}"></div><div><label for="fp">Protein (g)</label><input id="fp" inputmode="decimal" value="${esc(f.p)}"></div><div><label for="fb">Carbs (g)</label><input id="fb" inputmode="decimal" value="${esc(f.c)}"></div><div><label for="ff">Fat (g)</label><input id="ff" inputmode="decimal" value="${esc(f.f)}"></div></div>`}
+function foodRead(){return{n:$('fn').value.trim(),srv:$('fs').value.trim(),cal:nNum($('fc').value),p:nNum($('fp').value),c:nNum($('fb').value),f:nNum($('ff').value)}}
+function foodSaved(f){return S.nut.foods.some(x=>x.n.toLowerCase()===f.n.toLowerCase()&&(x.srv||'').toLowerCase()===(f.srv||'').toLowerCase())}
+function nutSug(){const box=$('nsug');if(!box)return;const t=($('fn').value||'').trim().toLowerCase(),rec=nutRecent(),all=[...rec,...S.nut.foods.filter(f=>!rec.some(r=>r.n.toLowerCase()===f.n.toLowerCase()&&(r.srv||'')===(f.srv||'')))];
+ const L=(t?all.filter(f=>f.n.toLowerCase().includes(t)):all).slice(0,8);window._sg=L;
+ box.innerHTML=L.length?`<div class="dim small">${t?'Matches':'Recent and saved'} · tap to fill</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">${L.map((f,i)=>`<button style="min-height:40px;padding:6px 12px;font-size:15px" onclick="nutPick(${i})">${esc(f.n)} · ${Math.round(f.cal)}</button>`).join('')}</div>`:''}
+function nutPick(i){const f=window._sg[i];if(!f)return;$('fn').value=f.n;$('fs').value=f.srv||'';$('fc').value=f.cal;$('fp').value=f.p;$('fb').value=f.c;$('ff').value=f.f;if($('fv'))$('fv').checked=!foodSaved(f);$('nsug').innerHTML='';$('fq').focus()}
+function nutAdd(meal){sheet(`<h2>Add food</h2><div class="dim small">${esc(nutDate())}</div>
+ <label for="fm" style="margin-top:10px">Meal</label><select id="fm">${MEALS.map(([k,l])=>`<option value="${k}"${k===(meal||defMeal())?' selected':''}>${l}</option>`).join('')}</select>
+ <div id="nsug" style="margin:10px 0"></div>${foodFields()}
+ <label for="fq" style="margin-top:10px">Servings</label><input id="fq" inputmode="decimal" value="1">
+ <label class="ck"><input id="fv" type="checkbox" checked><span>Save to my foods</span></label>
+ <div class="btns"><button onclick="closeSheet()">Cancel</button><button class="pri" style="margin:0;font-size:18px;min-height:50px" onclick="nutSave()">Add</button></div>`);nutSug()}
+function nutSave(){const f=foodRead();if(!f.n){$('fn').focus();return}
+ (S.nut.days[nutD]=S.nut.days[nutD]||[]).push({id:nid(),meal:$('fm').value,...f,q:nNum($('fq').value)||1});
+ if($('fv').checked&&!foodSaved(f))S.nut.foods.push({id:nid(),...f});
+ save();closeSheet();render()}
+function nutEdit(id){const e=(S.nut.days[nutD]||[]).find(x=>x.id===id);if(!e)return;
+ sheet(`<h2>Edit entry</h2><label for="fm">Meal</label><select id="fm">${MEALS.map(([k,l])=>`<option value="${k}"${k===e.meal?' selected':''}>${l}</option>`).join('')}</select>${foodFields(e)}
+ <label for="fq" style="margin-top:10px">Servings</label><input id="fq" inputmode="decimal" value="${e.q}">
+ <div class="btns"><button class="danger" onclick="nutDel(${id})">Delete</button><button onclick="closeSheet()">Cancel</button><button class="pri" style="margin:0;font-size:18px;min-height:50px" onclick="nutUpdate(${id})">Save</button></div>`)}
+function nutUpdate(id){const e=(S.nut.days[nutD]||[]).find(x=>x.id===id),f=foodRead();if(!e||!f.n)return;Object.assign(e,f,{meal:$('fm').value,q:nNum($('fq').value)||1});save();closeSheet();render()}
+function nutDel(id){confirmSheet('Delete this entry?','Delete',()=>{S.nut.days[nutD]=(S.nut.days[nutD]||[]).filter(x=>x.id!==id);if(!S.nut.days[nutD].length)delete S.nut.days[nutD];save();render()},true)}
+function foodList(){const F=[...S.nut.foods].sort((a,b)=>a.n.localeCompare(b.n));
+ sheet(`<h2>My foods</h2>${F.length?`<ul class="l">${F.map(f=>`<li onclick="foodEdit(${f.id})">${esc(f.n)}<div class="dim small">${esc(f.srv||'1 serving')} · ${nR1(f.cal)} kcal · P ${nR1(f.p)} · C ${nR1(f.c)} · F ${nR1(f.f)}</div></li>`).join('')}</ul>`:'<p class="dim">Nothing saved yet. Tick "Save to my foods" when you add a food, or add one here.</p>'}
+ <div class="btns"><button onclick="closeSheet()">Close</button><button class="pri" style="margin:0;font-size:18px;min-height:50px" onclick="foodEdit()">+ New food</button></div>`)}
+function foodEdit(id){const f=id?S.nut.foods.find(x=>x.id===id):null;
+ sheet(`<h2>${f?'Edit':'New'} saved food</h2>${foodFields(f)}<div class="btns">${f?`<button class="danger" onclick="foodDel(${id})">Delete</button>`:''}<button onclick="foodList()">Back</button><button class="pri" style="margin:0;font-size:18px;min-height:50px" onclick="foodSave(${id||0})">Save</button></div>`)}
+function foodSave(id){const f=foodRead();if(!f.n){$('fn').focus();return}if(id){const x=S.nut.foods.find(y=>y.id===id);if(x)Object.assign(x,f)}else S.nut.foods.push({id:nid(),...f});save();foodList();render()}
+function foodDel(id){confirmSheet('Delete this saved food? Past diary entries stay.','Delete',()=>{S.nut.foods=S.nut.foods.filter(x=>x.id!==id);save();foodList();render()},true)}
+function nutGoals(){const G=S.nut.goals;sheet(`<h2>Daily goals</h2><div class="dim small">Enter your own targets. Leave a box blank to leave that goal unset.</div>
+ <div class="row" style="grid-template-columns:repeat(2,1fr)"><div><label for="gc">Calories</label><input id="gc" inputmode="decimal" value="${esc(G.cal)}"></div><div><label for="gp">Protein (g)</label><input id="gp" inputmode="decimal" value="${esc(G.p)}"></div><div><label for="gb">Carbs (g)</label><input id="gb" inputmode="decimal" value="${esc(G.c)}"></div><div><label for="gf">Fat (g)</label><input id="gf" inputmode="decimal" value="${esc(G.f)}"></div></div>
+ <div class="btns"><button onclick="closeSheet()">Cancel</button><button class="pri" style="margin:0;font-size:18px;min-height:50px" onclick="nutGoalSave()">Save</button></div>`)}
+function nutGoalSave(){const g=id=>{const v=$(id).value.trim();return v===''?'':nNum(v)};S.nut.goals={cal:g('gc'),p:g('gp'),c:g('gb'),f:g('gf')};save();closeSheet();render()}
+
+/* ===== Yoga & Mobility: separate from lifting (S.yoga) ===== */
+const YTYPES=['Yoga flow','Mobility','Recovery'];
+const YOGA=[
+ {id:'y1',n:'Gentle Morning Flow',type:'Yoga flow',mins:10,focus:['Full body','Spine'],eq:['Yoga mat'],steps:['Easy seated breathing · 1 min','Cat-cow on hands and knees · 1 min','Child’s pose · 1 min','Low lunge, hands on thighs or blocks · 1 min per side','Standing forward fold, soft knees · 1 min','Standing side bends · 1 min','Supine twist · 1 min per side','Rest, slow breathing · 1 min'],easy:'Hold each move half as long and stay in a small range.',note:'Breathe through your nose and move slowly.'},
+ {id:'y2',n:'Hips & Glutes Flow',type:'Yoga flow',mins:20,focus:['Hips','Glutes'],eq:['Yoga mat','Yoga blocks'],steps:['Cat-cow · 1 min','Low lunge, back knee down · 1.5 min per side','Lizard lunge, hands on blocks · 1 min per side','Half splits, hands on blocks · 1 min per side','Figure-four on your back · 2 min per side','Reclined pigeon or pigeon with a block under the hip · 2 min per side','Bridge pose · 1 min','Happy baby · 1 min','Supine twist · 1 min per side'],easy:'Choose the reclined versions and rest your hands on blocks.',note:''},
+ {id:'y3',n:'Post-Lift Lower Body Recovery',type:'Recovery',mins:12,focus:['Quads','Hamstrings','Glutes','Calves'],eq:['Yoga mat','Resistance band or strap'],steps:['Supine hamstring stretch with band · 1 min per leg','Figure-four on your back · 1 min per side','Low lunge quad stretch · 1 min per side','Calf stretch at a wall · 1 min per side','Child’s pose with knees wide · 1 min','Legs up the wall or on a chair · 2 min','Slow breathing · 1 min'],easy:'',note:'Keep stretches around 5 or 6 out of 10, never painful.'},
+ {id:'y4',n:'Upper Back & Thoracic Mobility',type:'Mobility',mins:10,focus:['Upper back','Chest','Neck'],eq:['Yoga mat'],steps:['Cat-cow · 1 min','Side-lying open book, small range · 1 min per side','Kneeling thoracic rotation, hands across chest · 1 min per side','Chin tucks · 1 min','Shoulder blade squeezes, arms low · 1 min','Lying on your back with a rolled towel under the upper back · 2 min','Easy neck side stretch · 30 sec per side'],easy:'Reduce the range and stop before any shoulder discomfort.',note:'Keep arms below shoulder height. Skip anything that pinches the shoulder.'},
+ {id:'y5',n:'Hip Mobility Circuit',type:'Mobility',mins:8,focus:['Hips','Ankles'],eq:['Yoga mat'],steps:['90/90 hip switches · 1 min','Hip circles on hands and knees · 1 min per side','Deep squat hold, holding a post for support · 1 min','Low lunge with a gentle rock · 1 min per side','Glute bridge holds · 1 min','Rest · 1 min'],easy:'Use forearms instead of hands, or skip the circles.',note:''},
+ {id:'y6',n:'Evening Wind-Down',type:'Recovery',mins:15,focus:['Relaxation','Hips','Lower back'],eq:['Yoga mat','Yoga blocks'],steps:['Reclined butterfly, blocks under knees · 3 min','Supine twist · 2 min per side','Knees to chest, gentle rocking · 1 min','Legs up the wall · 4 min','Final rest with slow breathing · 3 min'],easy:'',note:'Dim the lights and keep the pace slow.'},
+ {id:'y7',n:'Standing Balance & Legs Flow',type:'Yoga flow',mins:15,focus:['Legs','Balance','Core'],eq:['Yoga mat'],steps:['Mountain pose breathing · 1 min','Chair pose, hands at heart or low · 1 min','Warrior II, hands on hips if you prefer · 1 min per side','Triangle, hand on shin or a block · 1 min per side','Tree pose near a wall · 1 min per side','Standing forward fold · 1 min','Boat pose with knees bent · 2 min','Seated twist · 1 min per side','Rest · 2 min'],easy:'Stay near a wall and shorten the holds.',note:''},
+ {id:'y8',n:'Desk Reset',type:'Mobility',mins:5,focus:['Neck','Hips','Spine'],eq:[],steps:['Neck rolls, small and slow · 30 sec','Shoulder rolls, gentle · 30 sec','Seated twist · 30 sec per side','Standing hip flexor stretch · 30 sec per side','Standing forward fold, soft knees · 1 min','Slow breathing, shoulders relaxed · 1 min'],easy:'',note:'Good any time you have been sitting a while.'},
+ {id:'y9',n:'Band Hips & Hamstrings',type:'Mobility',mins:12,focus:['Hamstrings','Hips'],eq:['Yoga mat','Resistance band or strap'],steps:['Supine hamstring stretch, band around the foot · 1.5 min per leg','Supine leg out to the side with band, hip opener · 1.5 min per side','Banded bridge, press knees out against the band · 2 min','Banded clamshells · 10 reps per side','Child’s pose · 1 min','Rest · 1 min'],easy:'Use a lighter band or a towel instead.',note:''}
+];
+let yFilter='All';
+function yAll(){return [...YOGA,...S.yoga.custom]}
+function moreView(){return `<h2>More</h2><div class="btns" style="flex-direction:column"><button onclick="view='gear';pg=null;render();scrollTo(0,0)">Gear · equipment and movements</button><button onclick="view='settings';pg=null;render();scrollTo(0,0)">Rotation · slots, queue and backup</button></div>`}
+function yoga(){const L=yAll().filter(r=>yFilter==='All'||r.type===yFilter),lg=[...S.yoga.log].sort((a,b)=>b.t-a.t),wk=lg.filter(e=>e.t>Date.now()-7*864e5);
+ return `<div style="display:flex;justify-content:space-between;align-items:center"><h2>Yoga &amp; Mobility</h2><button style="min-height:44px;padding:8px 14px" onclick="yForm()">+ Routine</button></div>
+ <div class="dim small">Separate from your lifting rotation: logging a session never moves the queue. Go gently, skip anything that pinches, and follow any guidance from your clinician or physical therapist.</div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">${['All',...YTYPES].map(t=>`<button style="min-height:40px;padding:6px 14px;font-size:15px;${t===yFilter?'border-color:var(--acc);color:var(--acc)':''}" onclick="yFilter='${t}';render()">${t}</button>`).join('')}</div>
+ <ul class="l">${L.map(r=>`<li onclick="yOpen('${r.id}')"><b>${esc(r.n)}</b><span class="tag">${esc(r.type)}</span><div class="dim small">${r.mins} min · ${esc(r.focus.join(', '))} · ${esc(r.eq.length?r.eq.join(', '):'No equipment')}</div></li>`).join('')}</ul>
+ <div class="card"><h2>Sessions</h2><div class="dim small">${wk.length} in the last 7 days · ${wk.reduce((a,e)=>a+e.mins,0)} min</div>${lg.length?`<ul class="l">${lg.slice(0,10).map(e=>`<li onclick="yLogView(${e.id})">${esc(e.n)}<span class="tag">${esc(e.type)}</span><div class="dim small">${fd(e.t)} · ${e.mins} min${e.nt?' · '+esc(e.nt.slice(0,50)):''}</div></li>`).join('')}</ul>`:'<p class="dim">No sessions logged yet.</p>'}</div>`}
+function yOpen(id){const r=yAll().find(x=>x.id===id);if(!r)return;const cu=id[0]==='c';
+ sheet(`<h2>${esc(r.n)}</h2><div class="dim small">${esc(r.type)} · ${r.mins} min</div>
+ <div style="margin-top:8px"><b>Focus:</b> ${esc(r.focus.join(', '))}</div><div><b>Equipment:</b> ${esc(r.eq.join(', ')||'None')}</div>
+ <ol style="padding-left:22px;margin:10px 0">${r.steps.map(s=>`<li style="padding:4px 0">${esc(s)}</li>`).join('')}</ol>
+ ${r.easy?`<div class="small"><b>Gentler option:</b> ${esc(r.easy)}</div>`:''}${r.note?`<div class="dim small" style="margin-top:6px">${esc(r.note)}</div>`:''}
+ <div class="row" style="grid-template-columns:1fr 2fr"><div><label for="ym">Minutes</label><input id="ym" inputmode="numeric" value="${r.mins}"></div><div><label for="yn">Notes</label><input id="yn" type="text"></div></div>${dateField()}
+ <button class="pri" onclick="yLog('${id}')">COMPLETE &amp; LOG</button>
+ <div class="btns"><button onclick="yForm('${id}')">${cu?'Edit':'Copy to mine'}</button>${cu?`<button class="danger" onclick="yDel('${id}')">Delete</button>`:''}<button onclick="closeSheet()">Close</button></div>`)}
+function yLog(id){const r=yAll().find(x=>x.id===id);if(!r)return;const t=pickT();
+ S.yoga.log.push({id:t+Math.floor(Math.random()*1e3),t,rid:id,n:r.n,type:r.type,mins:Math.round(nNum($('ym').value))||r.mins,nt:$('yn').value.trim()});save();closeSheet();render()}
+function yLogView(id){const e=S.yoga.log.find(x=>x.id===id);if(!e)return;
+ sheet(`<h2>${esc(e.n)}</h2><div class="dim small">${new Date(e.t).toLocaleDateString()} · ${e.mins} min · ${esc(e.type)}</div>${e.nt?`<p>${esc(e.nt)}</p>`:''}<div class="btns"><button class="danger" onclick="yLogDel(${id})">Delete</button><button onclick="closeSheet()">Close</button></div>`)}
+function yLogDel(id){confirmSheet('Delete this session?','Delete',()=>{S.yoga.log=S.yoga.log.filter(x=>x.id!==id);save();render()},true)}
+function yForm(id){const r=id?yAll().find(x=>x.id===id):null,edit=!!r&&id[0]==='c';
+ sheet(`<h2>${edit?'Edit routine':r?'Copy to my routines':'New routine'}</h2>
+ <label for="rn1">Name</label><input id="rn1" type="text" value="${esc(r?(edit?r.n:r.n+' (mine)'):'')}">
+ <div class="row" style="grid-template-columns:2fr 1fr"><div><label for="rt1">Type</label><select id="rt1">${YTYPES.map(t=>`<option${r&&r.type===t?' selected':''}>${t}</option>`).join('')}</select></div><div><label for="rm1">Minutes</label><input id="rm1" inputmode="numeric" value="${r?r.mins:10}"></div></div>
+ <label for="rf1">Focus areas (comma separated)</label><input id="rf1" type="text" value="${esc(r?r.focus.join(', '):'')}" placeholder="Hips, hamstrings">
+ <label for="re1" style="margin-top:10px">Equipment (comma separated, blank for none)</label><input id="re1" type="text" value="${esc(r?r.eq.join(', '):'Yoga mat')}">
+ <label for="rs1" style="margin-top:10px">Movements / instructions (one per line)</label><textarea id="rs1" style="min-height:120px">${esc(r?r.steps.join('\n'):'')}</textarea>
+ <label for="rg1" style="margin-top:10px">Gentler option (optional)</label><input id="rg1" type="text" value="${esc(r?r.easy:'')}">
+ <label for="ro1" style="margin-top:10px">Notes (optional)</label><input id="ro1" type="text" value="${esc(r?r.note:'')}">
+ <div class="btns"><button onclick="closeSheet()">Cancel</button><button class="pri" style="margin:0;font-size:18px;min-height:50px" onclick="yFormSave('${edit?id:''}')">Save</button></div>`)}
+function yFormSave(eid){const sp=v=>v.split(',').map(x=>x.trim()).filter(Boolean),n=$('rn1').value.trim(),steps=$('rs1').value.split('\n').map(x=>x.trim()).filter(Boolean);
+ if(!n||!steps.length){return msg('Add a name and at least one movement.')}
+ const r={id:eid||'c'+Date.now(),n,type:$('rt1').value,mins:Math.max(1,Math.round(nNum($('rm1').value))||10),focus:sp($('rf1').value).length?sp($('rf1').value):['General'],eq:sp($('re1').value),steps,easy:$('rg1').value.trim(),note:$('ro1').value.trim()};
+ const i=S.yoga.custom.findIndex(x=>x.id===eid);if(eid&&i>=0)S.yoga.custom[i]=r;else S.yoga.custom.push(r);save();closeSheet();render()}
+function yDel(id){confirmSheet('Delete this routine? Logged sessions stay.','Delete',()=>{S.yoga.custom=S.yoga.custom.filter(x=>x.id!==id);save();render()},true)}
+
 function fillList(){const set=new Set([...S.slots.flatMap(x=>x.moves),...allAcc().map(a=>a.n),'Romanian Deadlift','Hang Clean','Squat Clean','Power Clean','Rows',...lifts().map(nameOf)]);$('mvlist').innerHTML=[...set].filter(Boolean).map(n=>`<option value="${esc(n)}">`).join('')}
 function render(){
- fillList();$('app').innerHTML=(view==='home'?home():view==='history'?history():view==='progress'?progress():view==='library'?library():view==='gear'?gear():settings())+verLine();
- $('nav').innerHTML=[['home','Today'],['history','History'],['progress','Progress'],['gear','Gear'],['settings','Rotation']].map(([v,l])=>`<button class="${view===v||(v==='settings'&&view==='library')?'on':''}" onclick="view='${v}';pg=null;render();scrollTo(0,0)">${l}</button>`).join('')}
+ fillList();$('app').innerHTML=(view==='home'?home():view==='history'?history():view==='progress'?progress():view==='nutrition'?nutrition():view==='yoga'?yoga():view==='more'?moreView():view==='library'?library():view==='gear'?gear():settings())+verLine();
+ $('nav').innerHTML=[['home','Today'],['history','History'],['progress','Progress'],['nutrition','Nutrition'],['yoga','Yoga'],['more','More']].map(([v,l])=>`<button class="${view===v||(v==='more'&&['gear','settings','library'].includes(view))?'on':''}" onclick="view='${v}';pg=null;render();scrollTo(0,0)">${l}</button>`).join('')}
 render();
 </script>
 </body>
